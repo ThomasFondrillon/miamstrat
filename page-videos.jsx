@@ -71,6 +71,11 @@ function VideosPage({ plan, setPlan }) {
     }));
     setTagFilter(f => f.filter(x => x !== id));
   };
+  const tagDragRef = React.useRef(null);
+  const moveTag = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    setPlan(p => { const a = [...(p.tags || [])]; const [x] = a.splice(from, 1); a.splice(to, 0, x); return { ...p, tags: a }; });
+  };
 
   return (
     <div>
@@ -190,8 +195,12 @@ function VideosPage({ plan, setPlan }) {
         </button>
         {tagsOpen && <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={vidStyles.tagList}>
-          {tags.map(t => (
-            <span key={t.id} style={{ ...vidStyles.tagManageChip, color: t.color, border: `1px solid ${t.color}` }}>
+          {tags.map((t, i) => (
+            <span key={t.id} draggable
+              onDragStart={(e) => { e.dataTransfer.setData("text/plain", t.id); tagDragRef.current = i; }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); moveTag(tagDragRef.current, i); tagDragRef.current = null; }}
+              style={{ ...vidStyles.tagManageChip, color: t.color, border: `1px solid ${t.color}`, cursor: "grab" }} title="Glisser pour réorganiser">
               {t.name}
               <button style={vidStyles.tagX} onClick={() => removeTag(t.id)} aria-label={`Supprimer ${t.name}`} title="Supprimer l'étiquette">×</button>
             </span>

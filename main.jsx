@@ -13,7 +13,7 @@ function Shell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   useEffect(() => { document.body.setAttribute("data-theme", t.theme || "dark"); }, [t.theme]);
 
-  const DATA_KEYS = ["miamstrat_v2", "miamstrat_daily_v1", "miamstrat_plan_v1", "miamstrat_page"];
+  const DATA_KEYS = ["miamstrat_v2", "miamstrat_daily_v1", "miamstrat_plan_v1", "miamstrat_msgs_v1", "miamstrat_ideas_v1", "miamstrat_page"];
   const fileRef = React.useRef(null);
   const [importMsg, setImportMsg] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
@@ -42,6 +42,21 @@ function Shell() {
     a.download = `miamstrat-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    try { localStorage.setItem("miamstrat_lastexport", String(Date.now())); } catch (e) {}
+    setExportDue(false);
+  };
+
+  // Rappel hebdomadaire d'export
+  const [exportDue, setExportDue] = useState(() => {
+    try {
+      const last = +localStorage.getItem("miamstrat_lastexport") || 0;
+      if (!last) { localStorage.setItem("miamstrat_lastexport", String(Date.now())); return false; }
+      return Date.now() - last > 7 * 86400000;
+    } catch (e) { return false; }
+  });
+  const snoozeExport = () => {
+    try { localStorage.setItem("miamstrat_lastexport", String(Date.now())); } catch (e) {}
+    setExportDue(false);
   };
 
   const importData = (file) => {
@@ -96,6 +111,13 @@ function Shell() {
         </div>
       </nav>
 
+      {page === "objectifs" && exportDue && (
+        <div style={shellStyles.exportReminder}>
+          <span style={{ flex: 1, minWidth: 200 }}>💾 Plus d'une semaine sans sauvegarde — pense à exporter tes données !</span>
+          <button style={shellStyles.exportNowBtn} onClick={exportData}>Exporter maintenant</button>
+          <button style={shellStyles.exportLaterBtn} onClick={snoozeExport} title="Me le rappeler dans une semaine">Plus tard</button>
+        </div>
+      )}
       {page === "objectifs" && <ObjectifsPage strat={strat} setStrat={setStrat} plan={plan} setPlan={setPlan} tweaks={t} onOpenStrategy={() => setPage("strategie")} />}
       {page === "strategie" && <StrategyPage state={strat} setState={setStrat} />}
       {page === "planning" && <PlanningPage plan={plan} setPlan={setPlan} />}
@@ -184,6 +206,9 @@ const shellStyles = {
   importErr: {
     marginTop: 10, textAlign: "center", color: "#ff6b6b", fontSize: 12,
   },
+  exportReminder: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14, padding: "11px 16px", background: "var(--gold-soft)", border: "1px solid var(--gold)", borderRadius: 12, color: "var(--gold)", fontSize: 13.5, fontWeight: 600 },
+  exportNowBtn: { background: "var(--gold)", border: "none", color: "#1a1405", fontSize: 12, fontWeight: 700, padding: "7px 14px", borderRadius: 9, cursor: "pointer", flexShrink: 0 },
+  exportLaterBtn: { background: "transparent", border: "none", color: "var(--gold)", fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: "4px 2px", flexShrink: 0 },
   installOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 },
   installModal: { width: "min(420px, 100%)", background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: "20px 22px", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" },
   installClose: { width: 30, height: 30, borderRadius: 9, background: "var(--surface-2)", border: "1px solid var(--line-strong)", color: "var(--text)", fontSize: 16, cursor: "pointer", lineHeight: 1 },

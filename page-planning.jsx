@@ -358,8 +358,8 @@ function VideoDetailModal({ video, tags = [], onClose, onUpdate }) {
     setTimeout(() => setCopied(false), 1800);
   };
   return (
-    <div style={planStyles.overlay} onClick={onClose}>
-      <div style={planStyles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={`Détail — ${video.title}`}>
+    <div style={planStyles.overlay}>
+      <div style={planStyles.modal} role="dialog" aria-label={`Détail — ${video.title}`}>
         <div style={planStyles.modalHead}>
           <div style={{ minWidth: 0 }}>
             <div style={planStyles.modalTitle} className="display">{video.title}</div>
@@ -372,13 +372,6 @@ function VideoDetailModal({ video, tags = [], onClose, onUpdate }) {
           </div>
           <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
         </div>
-
-        {tags.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={planStyles.fieldLabel}>Étiquettes</label>
-            <TagPicker tags={tags} selected={video.tags || []} onToggle={(id) => onUpdate({ tags: (video.tags || []).includes(id) ? (video.tags || []).filter(x => x !== id) : [...(video.tags || []), id] })} />
-          </div>
-        )}
 
         <div style={planStyles.langTabs}>
           {["FR", "ENG"].map(l => (
@@ -402,18 +395,23 @@ function VideoDetailModal({ video, tags = [], onClose, onUpdate }) {
           style={{ ...planStyles.textarea, minHeight: 90 }} />
 
         <div style={planStyles.cmHead}>
-          <label style={{ ...planStyles.fieldLabel, margin: 0 }}>Message au CM</label>
+          <label style={{ ...planStyles.fieldLabel, margin: 0 }}>Mes idées de story</label>
           <div style={{ display: "flex", gap: 6 }}>
-            <button style={planStyles.cmBtn} onClick={() => onUpdate({ cmMessage: proposal })} title="Remplacer par la proposition basée sur la date planifiée">Proposition auto</button>
-            <button style={{ ...planStyles.cmBtn, ...(copied ? { color: "var(--green)", borderColor: "var(--green)" } : {}) }} onClick={() => copy(video.cmMessage || proposal)} title="Copier le message">{copied ? "✓ Copié !" : "Copier"}</button>
+            <button style={{ ...planStyles.cmBtn, ...(copied ? { color: "var(--green)", borderColor: "var(--green)" } : {}) }} onClick={() => copy(video.storyIdeas || "")} title="Copier">{copied ? "✓ Copié !" : "Copier"}</button>
           </div>
         </div>
         <textarea
-          value={video.cmMessage || ""}
-          onChange={(e) => onUpdate({ cmMessage: e.target.value })}
-          placeholder={proposal}
+          value={video.storyIdeas || ""}
+          onChange={(e) => onUpdate({ storyIdeas: e.target.value })}
+          placeholder="Coulisses du tournage, sondage, compte à rebours avant publication…"
           style={{ ...planStyles.textarea, minHeight: 90 }} />
-        <div style={planStyles.cmHint}>La proposition s'adapte à la date de publication planifiée dans le calendrier.</div>
+
+        {tags.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <label style={planStyles.fieldLabel}>Étiquettes</label>
+            <TagPicker tags={tags} selected={video.tags || []} onToggle={(id) => onUpdate({ tags: (video.tags || []).includes(id) ? (video.tags || []).filter(x => x !== id) : [...(video.tags || []), id] })} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -426,8 +424,8 @@ function EventDetailModal({ event, onClose, onUpdate }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div style={planStyles.overlay} onClick={onClose}>
-      <div style={{ ...planStyles.modal, width: "min(420px, 100%)" }} onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Détail de l'événement">
+    <div style={planStyles.overlay}>
+      <div style={{ ...planStyles.modal, width: "min(420px, 100%)" }} role="dialog" aria-label="Détail de l'événement">
         <div style={planStyles.modalHead}>
           <div style={planStyles.modalTitle} className="display">Événement</div>
           <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
