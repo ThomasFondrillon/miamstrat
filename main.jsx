@@ -107,6 +107,8 @@ function Shell() {
   useEffect(() => { try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (e) {} }, [plan]);
   const addVideoFromIdea = (title) => { setPlan(p => ({ ...p, videos: [...p.videos, { id: uid(), title, status: "contacter", date: null }] })); return true; };
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="app-root" style={shellStyles.root}>
       <nav className="shell-nav" style={shellStyles.nav}>
@@ -119,9 +121,14 @@ function Shell() {
             <div style={shellStyles.brandSub}>@miamcherie</div>
           </div>
         </div>
-        <div className="shell-tabs" style={shellStyles.tabs}>
+        <button className="shell-burger" style={shellStyles.burger} onClick={() => setMenuOpen(o => !o)} aria-label="Menu" aria-expanded={menuOpen}>
+          <span style={{ ...shellStyles.burgerBar, ...(menuOpen ? { transform: "translateY(6px) rotate(45deg)" } : {}) }}></span>
+          <span style={{ ...shellStyles.burgerBar, ...(menuOpen ? { opacity: 0 } : {}) }}></span>
+          <span style={{ ...shellStyles.burgerBar, ...(menuOpen ? { transform: "translateY(-6px) rotate(-45deg)" } : {}) }}></span>
+        </button>
+        <div className={"shell-tabs" + (menuOpen ? " open" : "")} style={shellStyles.tabs}>
           {NAV_PAGES.map(p => (
-            <button key={p.id} className="display" onClick={() => setPage(p.id)}
+            <button key={p.id} className="display" onClick={() => { setPage(p.id); setMenuOpen(false); }}
               style={{ ...shellStyles.tab, ...(page === p.id ? shellStyles.tabActive : {}) }}>
               {p.label}
             </button>
@@ -199,6 +206,8 @@ const shellStyles = {
   avatar: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   brandTitle: { fontSize: 18, fontWeight: 700, lineHeight: 1.1 },
   brandSub: { fontSize: 11.5, color: "var(--muted)", marginTop: 2 },
+  burger: { display: "none", flexDirection: "column", justifyContent: "center", gap: 4, width: 42, height: 42, background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 12, padding: 10, cursor: "pointer", flexShrink: 0 },
+  burgerBar: { display: "block", height: 2, borderRadius: 2, background: "var(--text)", transition: "all 0.2s" },
   tabs: {
     display: "flex", flexWrap: "wrap", gap: 4, padding: 4,
     background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 14,
@@ -242,9 +251,11 @@ shellStyleEl.textContent = `
   }
   @media (max-width: 640px) {
     .op-stats { grid-template-columns: 1fr !important; }
-    .shell-nav { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
-    .shell-tabs { width: 100% !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 4px !important; }
-    .shell-tabs button { padding: 9px 2px !important; font-size: 12.5px !important; text-align: center !important; }
+    .shell-nav { flex-wrap: wrap !important; justify-content: space-between !important; gap: 10px !important; }
+    .shell-burger { display: flex !important; }
+    .shell-tabs { display: none !important; }
+    .shell-tabs.open { display: flex !important; flex-direction: column !important; width: 100% !important; flex-basis: 100% !important; order: 10; margin-top: 10px; }
+    .shell-tabs.open button { padding: 12px 10px !important; font-size: 14.5px !important; text-align: left !important; }
   }
 `;
 document.head.appendChild(shellStyleEl);

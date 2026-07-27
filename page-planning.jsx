@@ -128,7 +128,9 @@ function PlanningPage({ plan, setPlan }) {
   const today = planToday();
 
   // Actives = sans date ou datées d'aujourd'hui/futur (l'historique complet est dans la page Vidéos).
-  const activeVideos = plan.videos.filter(v => !v.date || v.date >= today);
+  const [listStFilter, setListStFilter] = useState([]);
+  const toggleListSt = (id) => setListStFilter(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
+  const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today) && (listStFilter.length === 0 || listStFilter.includes(v.status)));
 
   const addVideo = () => {
     const t = newTitle.trim();
@@ -180,6 +182,18 @@ function PlanningPage({ plan, setPlan }) {
             <span style={planStyles.archCount} className="mono">{activeVideos.length}</span>
           </button>
           {videosOpen && <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
+          <div style={{ ...planStyles.legendBox, marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+            {PLAN_STATUSES.map(s => {
+              const on = listStFilter.includes(s.id);
+              return (
+                <button key={s.id} onClick={() => toggleListSt(s.id)} title="Filtrer la liste par cet état"
+                  style={{ ...planStyles.legendChip, border: "none", cursor: "pointer", color: s.color, background: s.bg, ...(on ? { boxShadow: `0 0 0 1.5px currentColor inset` } : listStFilter.length ? { opacity: 0.45 } : {}) }}>
+                  {s.label}
+                </button>
+              );
+            })}
+            {listStFilter.length > 0 && <button style={planStyles.legendClear} onClick={() => setListStFilter([])}>effacer</button>}
+          </div>
           <div style={planStyles.addRow}>
             <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVideo(); }} placeholder="Nom de la vidéo…" style={planStyles.addInput} />
             <button style={planStyles.addBtn} onClick={addVideo} disabled={!newTitle.trim()}>+</button>
@@ -203,13 +217,8 @@ function PlanningPage({ plan, setPlan }) {
                   onUnschedule={() => scheduleVideo(v.id, null)} />
               );
             })}
-            {activeVideos.length === 0 && <li style={planStyles.empty}>Aucune vidéo. Ajoute la première ↑</li>}
+            {activeVideos.length === 0 && <li style={planStyles.empty}>{listStFilter.length ? "Aucune vidéo pour ce filtre" : "Aucune vidéo. Ajoute la première ↑"}</li>}
           </ul>
-          <div style={planStyles.legendBox}>
-            {PLAN_STATUSES.map(s => (
-              <span key={s.id} style={{ ...planStyles.legendChip, color: s.color, background: s.bg }}>{s.label}</span>
-            ))}
-          </div>
           </div>}
 
           {/* ÉVÉNEMENTS */}
@@ -531,6 +540,7 @@ const planStyles = {
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 5, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   legendBox: { display: "flex", flexWrap: "wrap", gap: 5, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" },
   legendChip: { fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99 },
+  legendClear: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 10, textDecoration: "underline", cursor: "pointer", padding: "2px 4px" },
   calCard: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 22, padding: "20px 20px 16px" },
   calHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   calTitle: { fontSize: 19, fontWeight: 700 },
