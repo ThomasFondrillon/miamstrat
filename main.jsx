@@ -94,7 +94,7 @@ function Shell() {
       <nav className="shell-nav" style={shellStyles.nav}>
         <div style={shellStyles.brand}>
           <div style={shellStyles.avatarWrap}>
-            <img src="assets/avatar.png" alt="" style={shellStyles.avatar} />
+            <img src="assets/logo.png" alt="" style={shellStyles.avatar} />
           </div>
           <div>
             <div className="display" style={shellStyles.brandTitle}>Miamstrat</div>
