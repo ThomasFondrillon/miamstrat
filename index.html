@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Miam Stratégie — Paliers Instagram</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#ff3d92" />
+<link rel="apple-touch-icon" href="assets/avatar.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Miamstrat" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root, body[data-theme="dark"] {
+    --bg: #0a0a0e;
+    --bg-2: #0f0f15;
+    --surface: #15151d;
+    --surface-2: #1c1c26;
+    --surface-3: #242430;
+    --line: rgba(255,255,255,0.07);
+    --line-strong: rgba(255,255,255,0.14);
+    --pink: #ff3d92;
+    --pink-2: #ff66ab;
+    --pink-soft: rgba(255, 61, 146, 0.13);
+    --pink-glow: rgba(255, 61, 146, 0.45);
+    --gold: #ffc857;
+    --gold-soft: rgba(255, 200, 87, 0.13);
+    --green: #5be584;
+    --green-soft: rgba(91, 229, 132, 0.12);
+    --text: #f5f5f7;
+    --muted: #8d8d97;
+    --muted-2: #5a5a64;
+    --check-fg: #0a0a0e;
+    --backdrop-1: rgba(255, 61, 146, 0.10);
+    --backdrop-2: rgba(255, 200, 87, 0.05);
+    --noise-opacity: 0.025;
+  }
+  body[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-2: #f4f3ee;
+    --surface: #ffffff;
+    --surface-2: #f6f5f0;
+    --surface-3: #edeae2;
+    --line: rgba(20, 16, 30, 0.08);
+    --line-strong: rgba(20, 16, 30, 0.14);
+    --pink: #e91e7a;
+    --pink-2: #ff3d92;
+    --pink-soft: rgba(233, 30, 122, 0.10);
+    --pink-glow: rgba(233, 30, 122, 0.30);
+    --gold: #b88410;
+    --gold-soft: rgba(184, 132, 16, 0.10);
+    --green: #1f8a5b;
+    --green-soft: rgba(31, 138, 91, 0.10);
+    --text: #14101e;
+    --muted: #6b6577;
+    --muted-2: #9a94a6;
+    --check-fg: #ffffff;
+    --backdrop-1: rgba(233, 30, 122, 0.07);
+    --backdrop-2: rgba(184, 132, 16, 0.05);
+    --noise-opacity: 0.018;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .display { font-family: 'Sora', sans-serif; letter-spacing: -0.025em; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea { font-family: inherit; }
+  body[data-theme="dark"] input[type="date"], body[data-theme="dark"] input[type="number"] { color-scheme: dark; }
+  body[data-theme="light"] input[type="date"], body[data-theme="light"] input[type="number"] { color-scheme: light; }
+  input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.75; }
+
+  /* ambient backdrop */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, var(--backdrop-1), transparent 60%),
+      radial-gradient(800px 500px at 90% 110%, var(--backdrop-2), transparent 60%);
+    z-index: 0;
+  }
+  .bg-noise {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--noise-opacity);
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 var(--pink-glow), 0 0 30px rgba(255, 61, 146, 0.25); }
+    50% { box-shadow: 0 0 0 10px rgba(255, 61, 146, 0), 0 0 40px rgba(255, 61, 146, 0.45); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes pop-in {
+    from { transform: scale(0.5); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes confetti {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(-200px) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body data-theme="dark">
+<div class="bg-grid"></div>
+<div class="bg-noise"></div>
+<div id="root"></div>
+
+<script>
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "theme": "light",
+    "accent": "pink",
+    "density": "regular",
+    "mascotStage": "auto",
+    "mascotEmotion": "auto"
+  }/*EDITMODE-END*/;
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+<script type="text/babel" src="mascot.jsx"></script>
+<script type="text/babel" src="page-objectifs.jsx"></script>
+<script type="text/babel" src="page-planning.jsx"></script>
+<script type="text/babel" src="page-videos.jsx"></script>
+<script type="text/babel" src="page-idees.jsx"></script>
+<script type="text/babel" src="page-messages.jsx"></script>
+<script type="text/babel" src="main.jsx"></script>
+</body>
+</html>
