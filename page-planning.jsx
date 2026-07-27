@@ -131,6 +131,9 @@ function PlanningPage({ plan, setPlan }) {
   const [listStFilter, setListStFilter] = useState([]);
   const toggleListSt = (id) => setListStFilter(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
   const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today) && (listStFilter.length === 0 || listStFilter.includes(v.status)));
+  // Tri par état : Collab confirmée → À tourner → À monter → À publier → À contacter → Publiée (stable : l'ordre manuel est conservé au sein d'un même état)
+  const STATUS_ORDER = { confirmee: 0, tourner: 1, monter: 2, publier: 3, contacter: 4, publiee: 5 };
+  const sortedVideos = [...activeVideos].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
 
   const addVideo = () => {
     const t = newTitle.trim();
@@ -202,7 +205,7 @@ function PlanningPage({ plan, setPlan }) {
             <TagPicker tags={plan.tags || []} selected={newVideoTags} onToggle={(id) => setNewVideoTags(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id])} />
           )}
           <ul style={planStyles.list}>
-            {activeVideos.map(v => {
+            {sortedVideos.map(v => {
               const st = statusOf(v.status);
               const isSel = selectedId === v.id;
               return (
