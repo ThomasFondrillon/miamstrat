@@ -28,7 +28,9 @@ function MessagesPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [mode, setMode] = useState("message"); // "message" | "script"
   const isScript = mode === "script";
-  const shown = msgs.filter(x => (x.kind === "script") === isScript);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const shown = msgs.filter(x => (x.kind === "script") === isScript && (!q || x.title.toLowerCase().includes(q) || x.body.toLowerCase().includes(q)));
 
   const addMsg = () => setMsgs(m => [{ id: uid(), kind: mode, title: isScript ? "Nouveau script type" : "Nouveau message type", body: "" }, ...m]);
   const removeMsg = (id) => setMsgs(m => m.filter(x => x.id !== id));
@@ -52,6 +54,7 @@ function MessagesPage() {
         <button style={{ ...msgStyles.modeTab, ...(mode === "message" ? msgStyles.modeTabOn : {}) }} onClick={() => setMode("message")}>Messages</button>
         <button style={{ ...msgStyles.modeTab, ...(mode === "script" ? msgStyles.modeTabOn : {}) }} onClick={() => setMode("script")}>Scripts</button>
       </div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={isScript ? "Rechercher dans les scripts (titre ou contenu)…" : "Rechercher dans les messages (titre ou contenu)…"} style={msgStyles.search} />
       <div className="msg-grid" style={msgStyles.grid}>
         {shown.map(m => (
           <div key={m.id} style={msgStyles.card}>
@@ -76,7 +79,7 @@ function MessagesPage() {
             </div>
           </div>
         ))}
-        {shown.length === 0 && <div style={msgStyles.empty}>{isScript ? "Aucun script type. Crée le premier ↑" : "Aucun message type. Crée le premier ↑"}</div>}
+        {shown.length === 0 && <div style={msgStyles.empty}>{q ? "Aucun résultat pour cette recherche" : isScript ? "Aucun script type. Crée le premier ↑" : "Aucun message type. Crée le premier ↑"}</div>}
       </div>
     </div>
   );
@@ -90,6 +93,7 @@ const msgStyles = {
   modeTabs: { display: "flex", gap: 4, padding: 3, background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 11, width: "fit-content", marginBottom: 16 },
   modeTab: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 12.5, fontWeight: 700, padding: "7px 20px", borderRadius: 8, cursor: "pointer" },
   modeTabOn: { background: "var(--pink)", color: "#fff" },
+  search: { display: "block", width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 11, color: "var(--text)", fontSize: 14, padding: "10px 13px", outline: "none", marginBottom: 16 },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))", gap: 14, alignItems: "start" },
   card: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: "16px 16px 14px", display: "flex", flexDirection: "column", gap: 10 },
   title: { background: "transparent", border: "none", borderBottom: "1px dashed transparent", color: "var(--text)", fontSize: 16, fontWeight: 700, padding: "2px 0", outline: "none", width: "100%" },
