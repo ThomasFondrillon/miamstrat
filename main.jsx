@@ -6,12 +6,30 @@ const NAV_PAGES = [
   { id: "planning", label: "Planning" },
   { id: "videos", label: "Vidéos" },
   { id: "idees", label: "Idées" },
-  { id: "messages", label: "Messages" },
+  { id: "messages", label: "Modèles" },
 ];
 
 function Shell() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   useEffect(() => { document.body.setAttribute("data-theme", t.theme || "dark"); }, [t.theme]);
+
+  // Auto-scroll de la page pendant un glisser-déposer (haut/bas de l'écran)
+  useEffect(() => {
+    let raf = null, dy = 0;
+    const step = () => { if (dy) { window.scrollBy(0, dy); raf = requestAnimationFrame(step); } else raf = null; };
+    const onDrag = (e) => {
+      const EDGE = 90, MAX = 18;
+      if (e.clientY < EDGE) dy = -Math.ceil((EDGE - e.clientY) / EDGE * MAX);
+      else if (window.innerHeight - e.clientY < EDGE) dy = Math.ceil((EDGE - (window.innerHeight - e.clientY)) / EDGE * MAX);
+      else dy = 0;
+      if (dy && !raf) raf = requestAnimationFrame(step);
+    };
+    const onEnd = () => { dy = 0; };
+    document.addEventListener("dragover", onDrag);
+    document.addEventListener("drop", onEnd);
+    document.addEventListener("dragend", onEnd);
+    return () => { document.removeEventListener("dragover", onDrag); document.removeEventListener("drop", onEnd); document.removeEventListener("dragend", onEnd); if (raf) cancelAnimationFrame(raf); };
+  }, []);
 
   const DATA_KEYS = ["miamstrat_v2", "miamstrat_daily_v1", "miamstrat_plan_v1", "miamstrat_msgs_v1", "miamstrat_ideas_v1", "miamstrat_page"];
   const fileRef = React.useRef(null);
