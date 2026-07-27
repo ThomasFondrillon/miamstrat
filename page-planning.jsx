@@ -110,6 +110,20 @@ function PlanningPage({ plan, setPlan }) {
   const patchEvent = (id, patch) => setPlan(p => ({ ...p, events: (p.events || []).map(e => e.id === id ? { ...e, ...patch } : e) }));
   const removeEvent = (id) => setPlan(p => ({ ...p, events: (p.events || []).filter(e => e.id !== id) }));
 
+  const dragVideoRef = useRef(null);
+  const moveVideo = (fromId, toId) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setPlan(p => {
+      const a = [...p.videos];
+      const from = a.findIndex(v => v.id === fromId);
+      const to = a.findIndex(v => v.id === toId);
+      if (from < 0 || to < 0) return p;
+      const [x] = a.splice(from, 1);
+      a.splice(to, 0, x);
+      return { ...p, videos: a };
+    });
+  };
+
   const cells = useMemo(() => monthCells(plan.month), [plan.month]);
   const today = planToday();
 
@@ -119,9 +133,11 @@ function PlanningPage({ plan, setPlan }) {
   const addVideo = () => {
     const t = newTitle.trim();
     if (!t) return;
-    setPlan(p => ({ ...p, videos: [...p.videos, { id: uid(), title: t, status: "contacter", date: null, tags: newVideoTags }] }));
+    const id = uid();
+    setPlan(p => ({ ...p, videos: [...p.videos, { id, title: t, status: "contacter", date: null, tags: newVideoTags }] }));
     setNewTitle("");
     setNewVideoTags([]);
+    setDetailId(id);
   };
   const removeVideo = (id) => setPlan(p => ({ ...p, videos: p.videos.filter(v => v.id !== id) }));
   const cycleStatus = (id) => setPlan(p => ({
@@ -182,6 +198,8 @@ function PlanningPage({ plan, setPlan }) {
                   onRemove={() => removeVideo(v.id)}
                   onEdit={(t) => editTitle(v.id, t)}
                   onDetail={() => setDetailId(v.id)}
+                  onDragStartRow={() => { dragVideoRef.current = v.id; }}
+                  onDropRow={() => { moveVideo(dragVideoRef.current, v.id); dragVideoRef.current = null; }}
                   onUnschedule={() => scheduleVideo(v.id, null)} />
               );
             })}
@@ -297,13 +315,15 @@ function PlanningPage({ plan, setPlan }) {
   );
 }
 
-function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDetail, onUnschedule }) {
+function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDetail, onUnschedule, onDragStartRow, onDropRow }) {
   const [isEditing, setEditing] = useState(false);
   return (
     <li className="obj-row" draggable={!isEditing}
-      onDragStart={(e) => e.dataTransfer.setData("text/plain", video.id)}
+      onDragStart={(e) => { e.dataTransfer.setData("text/plain", video.id); onDragStartRow && onDragStartRow(); }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => { e.preventDefault(); onDropRow && onDropRow(); }}
       style={{ ...planStyles.row, ...(isSel ? planStyles.rowSel : {}) }}>
-      <span style={planStyles.grip} title="Glisser vers le calendrier">⋮⋮</span>
+      <span style={planStyles.grip} title="Glisser pour réorganiser ou planifier">⋮⋮</span>
       <div style={{ flex: 1, minWidth: 0 }}>
         {isEditing ? (
           <input autoFocus defaultValue={video.title}
@@ -331,6 +351,22 @@ function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDet
   );
 }
 
+// Toast global « Sauvegardé ✓ » affiché à la fermeture des popups
+function showSavedToast() {
+  let el = document.getElementById("saved-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "saved-toast";
+    el.textContent = "Sauvegardé ✓";
+    document.body.appendChild(el);
+  }
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 1800);
+}
+
 function cmProposal(video) {
   if (video.date) {
     const d = new Date(video.date + "T12:00:00");
@@ -340,7 +376,8 @@ function cmProposal(video) {
   return `Hello ! 👋 La vidéo « ${video.title} » est prête côté contenu mais pas encore planifiée. Peux-tu me proposer un créneau de publication cette semaine ? Script et descriptions FR/EN sont dans la fiche. Merci ! 🙏`;
 }
 
-function VideoDetailModal({ video, tags = [], onClose, onUpdate }) {
+function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
+  const onClose = React.useCallback(() => { showSavedToast(); onCloseRaw(); }, [onCloseRaw]);
   const [lang, setLang] = useState("FR");
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -417,7 +454,8 @@ function VideoDetailModal({ video, tags = [], onClose, onUpdate }) {
   );
 }
 
-function EventDetailModal({ event, onClose, onUpdate }) {
+function EventDetailModal({ event, onClose: onCloseRaw, onUpdate }) {
+  const onClose = React.useCallback(() => { showSavedToast(); onCloseRaw(); }, [onCloseRaw]);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);

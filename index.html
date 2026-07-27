@@ -87,6 +87,8 @@
   body[data-theme="dark"] input[type="date"], body[data-theme="dark"] input[type="number"] { color-scheme: dark; }
   body[data-theme="light"] input[type="date"], body[data-theme="light"] input[type="number"] { color-scheme: light; }
   input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.75; }
+  #saved-toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--surface); border: 1px solid var(--green); color: var(--green); font-size: 13px; font-weight: 700; padding: 9px 20px; border-radius: 99px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 9999; }
+  #saved-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ambient backdrop */
   .bg-grid {
