@@ -2,10 +2,12 @@ const { useState, useEffect, useMemo } = React;
 
 const DAILY_KEY = "miamstrat_daily_v1";
 const DEFAULT_DAILIES = [
-  { id: "d1", text: "Poster 1 story (coulisses, sondage ou bon plan)" },
-  { id: "d2", text: "Répondre à tous les commentaires & DM du jour" },
-  { id: "d3", text: "Interagir 15 min avec des comptes de ta niche" },
-  { id: "d4", text: "Avancer sur le Reel de la semaine (repérage, tournage ou montage)" },
+  { id: "d1", text: "Faire 3 réels" },
+  { id: "d2", text: "Mettre à jour le planning" },
+  { id: "d3", text: "Poster 5 stories (coulisses, sondage ou bon plan)" },
+  { id: "d4", text: "Répondre à tous les commentaires & DM du jour" },
+  { id: "d5", text: "Démarcher 10 entreprises" },
+  { id: "d6", text: "Interagir 30 min avec des comptes de ta niche" },
 ];
 
 function pad2(n) { return String(n).padStart(2, "0"); }
@@ -78,8 +80,20 @@ const OPIcon = {
 };
 
 function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStrategy }) {
-  const [data, setData] = useState(() => processDays(loadDaily()));
+  const [data, setData] = useState(() => {
+    let d = processDays(loadDaily());
+    const t = todayStr();
+    // plan préparé la veille : appliqué automatiquement, pas de popup
+    if (d.nextFor === t && Array.isArray(d.nextDailies)) {
+      d = { ...d, dailies: d.nextDailies, nextFor: null, nextDailies: null, promptSeen: t };
+    }
+    return d;
+  });
   useEffect(() => { try { localStorage.setItem(DAILY_KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
+  // popup de sélection à la première ouverture du jour
+  const [planModal, setPlanModal] = useState(null); // "today" | "tomorrow" | null
+  useEffect(() => { if (data.promptSeen !== todayStr()) setPlanModal("today"); }, []);
+  const freshDefaults = () => DEFAULT_DAILIES.map(o => ({ ...o }));
 
   const today = todayStr();
   const checks = data.log[today] || {};
@@ -113,6 +127,17 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
     return { ...d, dailies: d.dailies.filter(o => o.id !== id), points: Math.max(0, d.points - (wasChecked ? 10 : 0)), log: { ...d.log, [today]: dayLog } };
   });
   const editDaily = (id, text) => setData(d => ({ ...d, dailies: d.dailies.map(o => o.id === id ? { ...o, text } : o) }));
+  const tomorrow = nextDayStr(today);
+  const tomorrowReady = data.nextFor === tomorrow && Array.isArray(data.nextDailies);
+  const validatePlan = (items) => {
+    if (planModal === "tomorrow") setData(d => ({ ...d, nextFor: tomorrow, nextDailies: items }));
+    else setData(d => ({ ...d, dailies: items, promptSeen: today }));
+    setPlanModal(null);
+  };
+  const closePlan = () => {
+    if (planModal === "today") setData(d => ({ ...d, promptSeen: today }));
+    setPlanModal(null);
+  };
   const dragIdxRef = React.useRef(null);
   const moveDaily = (from, to) => {
     if (from == null || to == null || from === to) return;
@@ -249,6 +274,9 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
             <input value={newText} onChange={(e) => setNewText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addDaily(); }} placeholder="Ajouter un objectif journalier…" style={opStyles.addInput} />
             <button style={opStyles.addBtn} onClick={addDaily} disabled={!newText.trim()}>+ Ajouter</button>
           </div>
+          <button style={{ ...opStyles.tomorrowBtn, ...(tomorrowReady ? opStyles.tomorrowBtnDone : {}) }} onClick={() => setPlanModal("tomorrow")}>
+            {tomorrowReady ? "🌙 Objectifs de demain prêts ✓ — modifier" : "🌙 Choisir mes objectifs de demain"}
+          </button>
           {allDone && (
             <div style={opStyles.congrats}>🎉 Journée complète ! Bonus de série ce soir : <b>+{25 * (data.streak + 1)} pts</b></div>
           )}
@@ -277,6 +305,55 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
 
       <div style={opStyles.legend}>
         +10 pts / objectif coché · journée 100% = bonus de série croissant · −5 pts par objectif manqué en fin de journée · 1 ❤ par journée incomplète, 3 ❤ rechargés le 1er du mois
+      </div>
+
+      {planModal && (
+        <DailyPlanModal
+          mode={planModal}
+          initial={planModal === "tomorrow" ? (tomorrowReady ? data.nextDailies : freshDefaults()) : (data.promptSeen === today ? data.dailies : freshDefaults())}
+          onValidate={validatePlan}
+          onClose={closePlan} />
+      )}
+    </div>
+  );
+}
+
+function DailyPlanModal({ mode, initial, onValidate, onClose }) {
+  const [items, setItems] = useState(() => initial.map(o => ({ ...o })));
+  const [txt, setTxt] = useState("");
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+  const add = () => { const t = txt.trim(); if (!t) return; setItems(a => [...a, { id: uid(), text: t }]); setTxt(""); };
+  const isTomorrow = mode === "tomorrow";
+  return (
+    <div style={opStyles.overlay}>
+      <div style={opStyles.modal} role="dialog" aria-label={isTomorrow ? "Objectifs de demain" : "Objectifs du jour"}>
+        <div style={opStyles.modalHead}>
+          <div>
+            <div style={opStyles.modalTitle} className="display">{isTomorrow ? "🌙 Objectifs de demain" : "☀️ Tes objectifs du jour"}</div>
+            <div style={opStyles.modalSub}>{isTomorrow ? "Prépare ta journée de demain — la popup ne s'affichera pas au réveil" : "Ajuste ta liste avant de commencer la journée"}</div>
+          </div>
+          <button style={opStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
+        </div>
+        <ul style={{ ...opStyles.list, maxHeight: "45vh", overflowY: "auto" }}>
+          {items.map(o => (
+            <li key={o.id} style={opStyles.planRow}>
+              <input value={o.text} onChange={(e) => setItems(a => a.map(x => x.id === o.id ? { ...x, text: e.target.value } : x))} style={opStyles.planInput} />
+              <button className="obj-remove-btn" style={opStyles.remove} onClick={() => setItems(a => a.filter(x => x.id !== o.id))} aria-label="Supprimer" title="Supprimer"><Icon.Trash /></button>
+            </li>
+          ))}
+          {items.length === 0 && <li style={opStyles.empty}>Aucun objectif — ajoute le premier ↓</li>}
+        </ul>
+        <div style={opStyles.addRow}>
+          <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="Ajouter un objectif…" style={opStyles.addInput} />
+          <button style={opStyles.addBtn} onClick={add} disabled={!txt.trim()}>+ Ajouter</button>
+        </div>
+        <button style={opStyles.planValidate} onClick={() => onValidate(items)}>
+          {isTomorrow ? "Valider pour demain ✓" : "C'est parti ! ✓"}
+        </button>
       </div>
     </div>
   );
@@ -361,6 +438,17 @@ const opStyles = {
   sideTextDone: { color: "var(--muted)", textDecoration: "line-through", textDecorationThickness: "1px" },
   sideLink: { marginTop: 14, width: "100%", background: "transparent", border: "1px solid var(--line-strong)", color: "var(--pink)", fontSize: 13, fontWeight: 600, padding: "9px 12px", borderRadius: 10, cursor: "pointer" },
   legend: { marginTop: 18, color: "var(--muted-2)", fontSize: 11.5, lineHeight: 1.5, textAlign: "center", maxWidth: 720, marginLeft: "auto", marginRight: "auto" },
+  tomorrowBtn: { marginTop: 10, width: "100%", background: "transparent", border: "1px dashed var(--line-strong)", color: "var(--muted)", fontSize: 13, fontWeight: 600, padding: "10px 12px", borderRadius: 12, cursor: "pointer" },
+  tomorrowBtnDone: { border: "1px solid var(--green)", color: "var(--green)", background: "var(--green-soft)" },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 },
+  modal: { width: "min(520px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 20, padding: "20px 20px 18px", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" },
+  modalHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 },
+  modalTitle: { fontSize: 20, fontWeight: 700, lineHeight: 1.15 },
+  modalSub: { color: "var(--muted)", fontSize: 12.5, marginTop: 4 },
+  modalClose: { flexShrink: 0, background: "var(--surface-2)", border: "1px solid var(--line-strong)", color: "var(--muted)", width: 32, height: 32, borderRadius: 9, fontSize: 18, lineHeight: 1, cursor: "pointer" },
+  planRow: { display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 11 },
+  planInput: { flex: 1, minWidth: 0, background: "transparent", border: "none", color: "var(--text)", fontSize: 14, padding: "4px 4px", outline: "none" },
+  planValidate: { marginTop: 14, width: "100%", background: "var(--pink)", border: "none", color: "#fff", fontSize: 14.5, fontWeight: 700, padding: "12px 14px", borderRadius: 12, cursor: "pointer" },
 };
 
 Object.assign(window, { ObjectifsPage });
