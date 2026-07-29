@@ -98,6 +98,15 @@ function Shell() {
   const [page, setPage] = useState(() => {
     try { return localStorage.getItem("miamstrat_page") || "objectifs"; } catch (e) { return "objectifs"; }
   });
+
+  // bouton « remonter en haut » sur Planning et Vidéos
+  const [showTop, setShowTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   useEffect(() => { try { localStorage.setItem("miamstrat_page", page); } catch (e) {} }, [page]);
 
   const [strat, setStrat] = useState(loadState);
@@ -151,6 +160,10 @@ function Shell() {
       {page === "stats" && <StatsPage plan={plan} />}
       {page === "idees" && <IdeasPage onSendToPlan={addVideoFromIdea} />}
       {page === "messages" && <MessagesPage />}
+
+      {showTop && (
+        <button style={shellStyles.topBtn} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Remonter en haut" title="Remonter en haut">↑</button>
+      )}
 
       <footer style={shellStyles.footer}>
         <span style={{ color: "var(--muted-2)" }}>Sauvegardé automatiquement</span>
@@ -210,6 +223,7 @@ const shellStyles = {
   brandSub: { fontSize: 11.5, color: "var(--muted)", marginTop: 2 },
   burger: { display: "none", flexDirection: "column", justifyContent: "center", gap: 4, width: 42, height: 42, background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 12, padding: 10, cursor: "pointer", flexShrink: 0 },
   burgerBar: { display: "block", height: 2, borderRadius: 2, background: "var(--text)", transition: "all 0.2s" },
+  topBtn: { position: "fixed", bottom: 20, right: 20, zIndex: 900, width: 42, height: 42, borderRadius: "50%", background: "var(--surface)", border: "1px solid var(--line-strong)", color: "var(--muted)", fontSize: 18, cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.3)", opacity: 0.85 },
   tabs: {
     display: "flex", flexWrap: "wrap", gap: 4, padding: 4,
     background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 14,
