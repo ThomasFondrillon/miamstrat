@@ -5,6 +5,7 @@ const NAV_PAGES = [
   { id: "strategie", label: "Stratégie" },
   { id: "planning", label: "Planning" },
   { id: "videos", label: "Vidéos" },
+  { id: "stats", label: "Statistiques" },
   { id: "idees", label: "Idées" },
   { id: "messages", label: "Modèles" },
 ];
@@ -147,6 +148,7 @@ function Shell() {
       {page === "strategie" && <StrategyPage state={strat} setState={setStrat} />}
       {page === "planning" && <PlanningPage plan={plan} setPlan={setPlan} />}
       {page === "videos" && <VideosPage plan={plan} setPlan={setPlan} />}
+      {page === "stats" && <StatsPage plan={plan} />}
       {page === "idees" && <IdeasPage onSendToPlan={addVideoFromIdea} />}
       {page === "messages" && <MessagesPage />}
 

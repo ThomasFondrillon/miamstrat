@@ -19,15 +19,6 @@ function VideosPage({ plan, setPlan }) {
   const [newTag, setNewTag] = useState("");
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
-  const [statsOpen, setStatsOpen] = useState(true);
-
-  const tagStats = useMemo(() => {
-    const counts = tags.map(t => ({ tag: t, count: videos.filter(v => (v.tags || []).includes(t.id)).length }));
-    const used = counts.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
-    const unused = counts.filter(c => c.count === 0);
-    const max = used.length ? used[0].count : 1;
-    return { used, unused, max };
-  }, [videos, tags]);
   const detailVideo = videos.find(v => v.id === detailId) || null;
 
   const toggleIn = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
@@ -154,44 +145,6 @@ function VideosPage({ plan, setPlan }) {
           );
         })}
         {filtered.length === 0 && <div style={vidStyles.empty}>{videos.length === 0 ? "Aucune vidéo — crée-les depuis le Planning ou les Idées." : "Aucune vidéo ne correspond aux filtres."}</div>}
-      </div>
-
-      {/* STATISTIQUES PAR ÉTIQUETTE */}
-      <div style={{ ...vidStyles.tagCard, marginBottom: 14 }}>
-        <button style={vidStyles.tagToggle} onClick={() => setStatsOpen(o => !o)} aria-expanded={statsOpen}>
-          <span style={{ ...vidStyles.tagCaret, transform: statsOpen ? "rotate(90deg)" : "none" }}>›</span>
-          <span style={vidStyles.tagTitle} className="display">Statistiques par étiquette</span>
-          <span style={vidStyles.tagCount} className="mono">{tagStats.used.length}/{tags.length}</span>
-        </button>
-        {statsOpen && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {tagStats.used.length > 0 ? (
-              <div style={vidStyles.statList}>
-                {tagStats.used.map(({ tag, count }) => (
-                  <div key={tag.id} style={vidStyles.statRow}>
-                    <span style={{ ...vidStyles.statName, color: tag.color }}>{tag.name}</span>
-                    <div style={vidStyles.statBarTrack}>
-                      <div style={{ ...vidStyles.statBarFill, width: `${(count / tagStats.max) * 100}%`, background: tag.color }}></div>
-                    </div>
-                    <span style={vidStyles.statCount} className="mono">{count}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ color: "var(--muted)", fontSize: 13, fontStyle: "italic" }}>Aucune vidéo étiquetée pour l'instant.</div>
-            )}
-            {tagStats.unused.length > 0 && (
-              <div>
-                <div style={vidStyles.statGapLabel}>À couvrir · {tagStats.unused.length} étiquette{tagStats.unused.length > 1 ? "s" : ""} sans contenu</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                  {tagStats.unused.map(({ tag }) => (
-                    <span key={tag.id} style={{ ...vidStyles.tagChip, color: "var(--muted)", border: "1px dashed var(--line-strong)" }}>{tag.name}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* GESTION DES ÉTIQUETTES */}
