@@ -129,8 +129,10 @@ function PlanningPage({ plan, setPlan }) {
 
   // Actives = sans date ou datées d'aujourd'hui/futur (l'historique complet est dans la page Vidéos).
   const [listStFilter, setListStFilter] = useState([]);
+  const [listQuery, setListQuery] = useState("");
   const toggleListSt = (id) => setListStFilter(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
-  const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today) && (listStFilter.length === 0 || listStFilter.includes(v.status)));
+  const lq = listQuery.trim().toLowerCase();
+  const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today) && (listStFilter.length === 0 || listStFilter.includes(v.status)) && (!lq || v.title.toLowerCase().includes(lq)));
   // Tri par état : Collab confirmée → À tourner → À monter → À publier → À contacter → Publiée (stable : l'ordre manuel est conservé au sein d'un même état)
   const STATUS_ORDER = { confirmee: 0, tourner: 1, monter: 2, publier: 3, contacter: 4, publiee: 5 };
   const sortedVideos = [...activeVideos].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
@@ -197,6 +199,7 @@ function PlanningPage({ plan, setPlan }) {
             })}
             {listStFilter.length > 0 && <button style={planStyles.legendClear} onClick={() => setListStFilter([])}>effacer</button>}
           </div>
+          <input value={listQuery} onChange={(e) => setListQuery(e.target.value)} placeholder="Rechercher une vidéo…" style={planStyles.listSearch} />
           <div style={planStyles.addRow}>
             <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVideo(); }} placeholder="Nom de la vidéo…" style={planStyles.addInput} />
             <button style={planStyles.addBtn} onClick={addVideo} disabled={!newTitle.trim()}>+</button>
@@ -220,7 +223,7 @@ function PlanningPage({ plan, setPlan }) {
                   onUnschedule={() => scheduleVideo(v.id, null)} />
               );
             })}
-            {activeVideos.length === 0 && <li style={planStyles.empty}>{listStFilter.length ? "Aucune vidéo pour ce filtre" : "Aucune vidéo. Ajoute la première ↑"}</li>}
+            {activeVideos.length === 0 && <li style={planStyles.empty}>{lq ? "Aucun résultat pour cette recherche" : listStFilter.length ? "Aucune vidéo pour ce filtre" : "Aucune vidéo. Ajoute la première ↑"}</li>}
           </ul>
           </div>}
 
@@ -414,9 +417,10 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
             <div style={planStyles.modalTitle} className="display">{video.title}</div>
             <div style={planStyles.rowMeta}>
               <span style={{ ...planStyles.statusChip, color: st.color, background: st.bg, cursor: "default" }}>{st.label}</span>
-              {video.date
-                ? <span style={planStyles.dateTag} className="mono">📅 {video.date.slice(8)}/{video.date.slice(5, 7)}/{video.date.slice(0, 4)}</span>
-                : <span style={planStyles.dateTag}>non planifiée</span>}
+              <label style={planStyles.modalDateWrap} title="Date de publication planifiée">
+                📅 <input type="date" value={video.date || ""} onChange={(e) => onUpdate({ date: e.target.value || null })} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={planStyles.modalDateInput} />
+              </label>
+              {video.date && <button style={planStyles.modalDateClear} onClick={() => onUpdate({ date: null })} title="Déplanifier">×</button>}
             </div>
           </div>
           <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
@@ -539,11 +543,15 @@ const planStyles = {
   rowMeta: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" },
   statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer" },
   dateTag: { display: "inline-flex", alignItems: "center", gap: 3, color: "var(--muted)", fontSize: 10.5 },
+  modalDateWrap: { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--muted)", fontSize: 11 },
+  modalDateInput: { background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 7, color: "var(--text)", fontSize: 11.5, padding: "3px 6px", outline: "none", cursor: "pointer" },
+  modalDateClear: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 14, cursor: "pointer", padding: "0 2px", lineHeight: 1 },
   editInput: { width: "100%", background: "var(--bg)", border: "1px solid var(--pink)", borderRadius: 8, color: "var(--text)", fontSize: 13.5, padding: "5px 8px", outline: "none" },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 5, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   legendBox: { display: "flex", flexWrap: "wrap", gap: 5, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" },
   legendChip: { fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99 },
   legendClear: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 10, textDecoration: "underline", cursor: "pointer", padding: "2px 4px" },
+  listSearch: { width: "100%", boxSizing: "border-box", background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 10, color: "var(--text)", fontSize: 13, padding: "8px 11px", outline: "none" },
   calCard: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 22, padding: "20px 20px 16px" },
   calHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   calTitle: { fontSize: 19, fontWeight: 700 },
