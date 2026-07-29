@@ -410,7 +410,7 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
           <div style={{ minWidth: 0 }}>
             <div style={planStyles.modalTitle} className="display">{video.title}</div>
             <div style={planStyles.rowMeta}>
-              <span style={{ ...planStyles.statusChip, color: st.color, background: st.bg, cursor: "default" }}>{st.label}</span>
+              <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={() => { const i = PLAN_STATUSES.findIndex(s => s.id === video.status); onUpdate({ status: PLAN_STATUSES[(i + 1) % PLAN_STATUSES.length].id }); }} title="Cliquer pour changer l'état">{st.label}</button>
               <label style={planStyles.modalDateWrap} title="Date de publication planifiée">
                 📅 <input type="date" value={video.date || ""} onChange={(e) => onUpdate({ date: e.target.value || null })} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={planStyles.modalDateInput} />
               </label>
