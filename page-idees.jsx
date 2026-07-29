@@ -21,13 +21,14 @@ function IdeasPage({ onSendToPlan }) {
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const shownIdeas = ideas.filter(i => !q || i.text.toLowerCase().includes(q));
+  const shownIdeas = ideas.filter(i => !q || (i.title || "").toLowerCase().includes(q) || i.text.toLowerCase().includes(q));
 
-  const addIdea = () => setIdeas(l => [{ id: uid(), text: "" }, ...l]);
-  const patchIdea = (id, text) => setIdeas(l => l.map(i => i.id === id ? { ...i, text } : i));
+  const addIdea = () => setIdeas(l => [{ id: uid(), title: "", text: "" }, ...l]);
+  const patchIdea = (id, patch) => setIdeas(l => l.map(i => i.id === id ? { ...i, ...patch } : i));
   const removeIdea = (id) => setIdeas(l => l.filter(i => i.id !== id));
+  const ideaTitle = (idea) => ((idea.title || "").trim() || (idea.text.split("\n")[0] || "").trim()).slice(0, 90);
   const sendToPlan = (idea) => {
-    const title = (idea.text.split("\n")[0] || "").trim().slice(0, 90);
+    const title = ideaTitle(idea);
     if (!title) return;
     if (onSendToPlan(title)) {
       removeIdea(idea.id);
@@ -50,21 +51,27 @@ function IdeasPage({ onSendToPlan }) {
       <div className="msg-grid" style={ideaStyles.grid}>
         {shownIdeas.map(idea => (
           <div key={idea.id} style={ideaStyles.card}>
+            <input
+              value={idea.title || ""}
+              autoFocus={!idea.title && !idea.text}
+              onChange={(e) => patchIdea(idea.id, { title: e.target.value })}
+              placeholder="Titre de l'idée…"
+              style={ideaStyles.title}
+              className="display" />
             <textarea
               value={idea.text}
-              autoFocus={idea.text === ""}
-              onChange={(e) => patchIdea(idea.id, e.target.value)}
+              onChange={(e) => patchIdea(idea.id, { text: e.target.value })}
               placeholder="Note ton idée de vidéo…"
               style={ideaStyles.body} />
             <div style={ideaStyles.foot}>
               <button
-                style={{ ...ideaStyles.planBtn, ...(idea.text.trim() ? {} : { opacity: 0.4, cursor: "not-allowed" }) }}
-                disabled={!idea.text.trim()}
+                style={{ ...ideaStyles.planBtn, ...(ideaTitle(idea) ? {} : { opacity: 0.4, cursor: "not-allowed" }) }}
+                disabled={!ideaTitle(idea)}
                 onClick={() => sendToPlan(idea)}
-                title="Créer une vidéo « À planifier » dans le Planning et retirer l'idée d'ici">
+                title="Créer une vidéo dans le Planning et retirer l'idée d'ici">
                 → Basculer au Planning
               </button>
-              <button className="obj-remove-btn" style={ideaStyles.remove} onClick={() => { if (!idea.text.trim() || confirm("Supprimer cette idée ?")) removeIdea(idea.id); }} aria-label="Supprimer" title="Supprimer">
+              <button className="obj-remove-btn" style={ideaStyles.remove} onClick={() => { if ((!ideaTitle(idea) && !idea.text.trim()) || confirm("Supprimer cette idée ?")) removeIdea(idea.id); }} aria-label="Supprimer" title="Supprimer">
                 <Icon.Trash />
               </button>
             </div>
@@ -86,6 +93,7 @@ const ideaStyles = {
   toast: { marginBottom: 14, padding: "10px 16px", background: "var(--green-soft)", border: "1px solid var(--green)", borderRadius: 12, color: "var(--green)", fontSize: 13.5 },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14, alignItems: "start" },
   card: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: "14px 14px 12px", display: "flex", flexDirection: "column", gap: 10 },
+  title: { background: "transparent", border: "none", borderBottom: "1px dashed var(--line-strong)", color: "var(--text)", fontSize: 15.5, fontWeight: 700, padding: "2px 2px 6px", outline: "none", width: "100%" },
   body: { width: "100%", boxSizing: "border-box", minHeight: 100, background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12, color: "var(--text)", fontSize: 13.5, lineHeight: 1.5, padding: "10px 12px", outline: "none", resize: "vertical", fontFamily: "inherit" },
   foot: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 },
   planBtn: { background: "var(--pink-soft)", border: "1px solid var(--pink)", color: "var(--pink)", fontSize: 12, fontWeight: 700, padding: "7px 12px", borderRadius: 9, cursor: "pointer" },
