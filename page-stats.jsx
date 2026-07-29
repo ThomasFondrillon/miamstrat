@@ -23,7 +23,20 @@ function StatsPage({ plan }) {
   const byStatus = PLAN_STATUSES.map(s => ({ st: s, count: videos.filter(v => v.status === s.id).length })).filter(x => x.count > 0);
   const totalVideos = videos.length;
   const inProgress = videos.filter(v => ["tourner", "monter", "publier"].includes(v.status)).length;
-  const upcoming = videos.filter(v => v.date && v.date >= new Date().toISOString().slice(0, 10) && v.status !== "publiee").length;
+  const todayStr2 = new Date().toISOString().slice(0, 10);
+  const upcoming = videos.filter(v => v.date && v.date >= todayStr2 && v.status !== "publiee").length;
+
+  // ─── KPI développement ───
+  const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const pubIn = (from, to) => published.filter(v => v.date && v.date >= from && v.date < to).length;
+  const last4w = pubIn(dateNDaysAgo(28), todayStr2 + "z");
+  const prev4w = pubIn(dateNDaysAgo(56), dateNDaysAgo(28));
+  const rate = (last4w / 4);
+  const trend = last4w > prev4w ? "↗" : last4w < prev4w ? "↘" : "→";
+  const trendColor = last4w > prev4w ? "var(--green)" : last4w < prev4w ? "#ff6b6b" : "var(--muted)";
+  const late = videos.filter(v => v.date && v.date < todayStr2 && v.status !== "publiee").length;
+  const stock = videos.filter(v => ["monter", "publier"].includes(v.status)).length;
+  const stockWeeks = rate > 0 ? (stock / rate) : null;
 
   // ─── stats étiquettes (vidéos publiées) ───
   const tagStats = useMemo(() => {
@@ -39,12 +52,66 @@ function StatsPage({ plan }) {
         <div style={stStyles.pageSub}>Ta production vidéo en un coup d'œil</div>
       </div>
 
-      {/* CHIFFRES CLÉS */}
-      <div className="op-stats" style={stStyles.kpis}>
-        <div style={stStyles.kpiCard}><div style={{ ...stStyles.kpiValue, color: "var(--green)" }} className="display">{published.length}</div><div style={stStyles.kpiLabel}>vidéos publiées</div></div>
-        <div style={stStyles.kpiCard}><div style={stStyles.kpiValue} className="display">{totalVideos}</div><div style={stStyles.kpiLabel}>vidéos au total</div></div>
-        <div style={stStyles.kpiCard}><div style={{ ...stStyles.kpiValue, color: "var(--pink)" }} className="display">{inProgress}</div><div style={stStyles.kpiLabel}>en production</div></div>
-        <div style={stStyles.kpiCard}><div style={{ ...stStyles.kpiValue, color: "var(--gold)" }} className="display">{upcoming}</div><div style={stStyles.kpiLabel}>planifiées à venir</div></div>
+      {/* ENTONNOIR DE PRODUCTION */}
+      <div style={stStyles.card}>
+        <div style={stStyles.funnel} className="st-funnel">
+          {[
+            { label: "À tourner", count: videos.filter(v => v.status === "tourner").length, color: "var(--pink)", bg: "var(--pink-soft)" },
+            { label: "À monter", count: videos.filter(v => v.status === "monter").length, color: "var(--gold)", bg: "var(--gold-soft)" },
+            { label: "Publiée", count: published.length, color: "var(--green)", bg: "var(--green-soft)" },
+          ].map((s, i, arr) => (
+            <React.Fragment key={s.label}>
+              <div style={stStyles.funnelStep}>
+                <div style={{ ...stStyles.funnelBubble, background: s.bg, border: `2px solid ${s.color}`, boxShadow: `0 0 22px color-mix(in srgb, ${s.color} 25%, transparent)` }}>
+                  <span style={{ ...stStyles.funnelCount, color: s.color }} className="display">{s.count}</span>
+                </div>
+                <div style={{ ...stStyles.funnelLabel, color: s.color }}>{s.label}</div>
+              </div>
+              {i < arr.length - 1 && <div style={stStyles.funnelArrow} className="st-funnel-arrow">→</div>}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* BANDE KPI */}
+        <div style={stStyles.kpiStrip} className="op-stats">
+          {/* rythme : jauge circulaire */}
+          <div style={stStyles.miniKpi}>
+            <svg width="64" height="64" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface-3)" strokeWidth="7"></circle>
+              <circle cx="32" cy="32" r="26" fill="none" stroke={trendColor === "var(--muted)" ? "var(--pink)" : trendColor} strokeWidth="7" strokeLinecap="round"
+                strokeDasharray={`${Math.min(1, rate / 7) * 163.4} 163.4`} transform="rotate(-90 32 32)"></circle>
+              <text x="32" y="30" textAnchor="middle" fill="var(--text)" fontSize="15" fontWeight="700">{rate.toFixed(1).replace(".", ",")}</text>
+              <text x="32" y="43" textAnchor="middle" fill={trendColor} fontSize="12" fontWeight="700">{trend}</text>
+            </svg>
+            <div>
+              <div style={stStyles.miniKpiLabel}>Publiées / semaine</div>
+              <div style={stStyles.miniKpiSub}>{last4w} sur 4 sem. (avant : {prev4w})</div>
+            </div>
+          </div>
+          {/* retard : pastille d'alerte */}
+          <div style={stStyles.miniKpi}>
+            <div style={{ ...stStyles.alertDot, background: late > 0 ? "rgba(255,107,107,0.14)" : "var(--green-soft)", border: `2px solid ${late > 0 ? "#ff6b6b" : "var(--green)"}`, color: late > 0 ? "#ff6b6b" : "var(--green)" }} className="display">
+              {late > 0 ? late : "✓"}
+            </div>
+            <div>
+              <div style={stStyles.miniKpiLabel}>En retard</div>
+              <div style={stStyles.miniKpiSub}>{late > 0 ? "date passée, non publiées" : "rien en retard 🎉"}</div>
+            </div>
+          </div>
+          {/* stock : jauge de remplissage */}
+          <div style={stStyles.miniKpi}>
+            <div style={{ flexShrink: 0, width: 64, textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#7a9bff" }} className="display">{stock}</div>
+              <div style={stStyles.stockTrack}>
+                <div style={{ ...stStyles.stockFill, width: `${stockWeeks != null ? Math.min(100, (stockWeeks / 4) * 100) : stock > 0 ? 15 : 0}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div style={stStyles.miniKpiLabel}>Stock</div>
+              <div style={stStyles.miniKpiSub}>à monter + à publier{stockWeeks != null ? ` · ≈ ${stockWeeks.toFixed(1).replace(".", ",")} sem. d'avance` : ""}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* PUBLICATIONS PAR MOIS */}
@@ -119,6 +186,20 @@ const stStyles = {
   kpiCard: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 16, padding: "14px 16px", textAlign: "center" },
   kpiValue: { fontSize: 28, fontWeight: 700, lineHeight: 1.1 },
   kpiLabel: { color: "var(--muted)", fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 4 },
+  kpiSub: { color: "var(--muted-2)", fontSize: 10.5, marginTop: 3 },
+  funnel: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", padding: "6px 0 14px" },
+  funnelStep: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8 },
+  funnelBubble: { width: 86, height: 86, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" },
+  funnelCount: { fontSize: 30, fontWeight: 700, lineHeight: 1 },
+  funnelLabel: { fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" },
+  funnelArrow: { color: "var(--muted-2)", fontSize: 26, fontWeight: 700, marginBottom: 22 },
+  kpiStrip: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 14 },
+  miniKpi: { display: "flex", alignItems: "center", gap: 12 },
+  miniKpiLabel: { color: "var(--text)", fontSize: 12.5, fontWeight: 700 },
+  miniKpiSub: { color: "var(--muted)", fontSize: 11, marginTop: 2 },
+  alertDot: { flexShrink: 0, width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700 },
+  stockTrack: { marginTop: 4, height: 8, background: "var(--surface-3)", borderRadius: 99, overflow: "hidden", border: "1px solid var(--line)" },
+  stockFill: { height: "100%", borderRadius: 99, background: "linear-gradient(90deg, #7a9bff, #a8bdff)" },
   card: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: "16px 18px", marginBottom: 14 },
   cardTitle: { fontSize: 16, fontWeight: 700, marginBottom: 14 },
   barChart: { display: "flex", alignItems: "flex-end", gap: 10, height: 140 },

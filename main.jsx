@@ -247,18 +247,20 @@ const shellStyles = {
 // shell + pages responsive css
 const shellStyleEl = document.createElement("style");
 shellStyleEl.textContent = `
+  @media (max-width: 1060px) {
+    .shell-tabs button { padding: 8px 10px !important; font-size: 12.5px !important; }
+  }
   @media (max-width: 900px) {
     .op-grid { grid-template-columns: 1fr !important; }
     .plan-grid { grid-template-columns: 1fr !important; }
-  }
-  @media (max-width: 640px) {
-    .op-stats { grid-template-columns: 1fr !important; }
     .shell-nav { flex-wrap: wrap !important; justify-content: space-between !important; gap: 10px !important; }
     .shell-burger { display: flex !important; }
     .shell-tabs { display: none !important; }
     .shell-tabs.open { display: flex !important; flex-direction: column !important; width: 100% !important; flex-basis: 100% !important; order: 10; margin-top: 10px; }
     .shell-tabs.open button { padding: 12px 10px !important; font-size: 14.5px !important; text-align: left !important; }
   }
+  @media (max-width: 640px) {
+    .op-stats { grid-template-columns: 1fr !important; }
 `;
 document.head.appendChild(shellStyleEl);
 
