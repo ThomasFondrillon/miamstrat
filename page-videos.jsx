@@ -9,6 +9,8 @@ function VideosPage({ plan, setPlan }) {
   const [stFilter, setStFilter] = useState([]);
   const [tagFilter, setTagFilter] = useState([]);
   const [detailId, setDetailId] = useState(null);
+  const [stateDatesId, setStateDatesId] = useState(null);
+  const stateDatesVideo = videos.find(v => v.id === stateDatesId) || null;
   const [newVideoModal, setNewVideoModal] = useState(false);
   const createVideo = ({ title, tags: vTags, openDetail }) => {
     const id = uid();
@@ -37,7 +39,7 @@ function VideosPage({ plan, setPlan }) {
     return [...videos]
       .filter(v =>
         (!q || v.title.toLowerCase().includes(q)) &&
-        (stFilter.length === 0 || stFilter.includes(v.status)) &&
+        (stFilter.length === 0 || stFilter.some(id => videoStates(v).includes(id))) &&
         (tagFilter.length === 0 || activeTagFilter.length === 0 || activeTagFilter.some(t => (v.tags || []).includes(t))) &&
         (!dateFrom || (v.date && v.date >= dateFrom)) &&
         (!dateTo || (v.date && v.date <= dateTo)))
@@ -140,13 +142,21 @@ function VideosPage({ plan, setPlan }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <button style={vidStyles.rowTitle} onClick={() => setDetailId(v.id)} title="Ouvrir la fiche">{v.title}</button>
                 <div style={vidStyles.rowMeta}>
-                  <button style={{ ...vidStyles.statusChip, color: st.color, background: st.bg }} onClick={() => cycleStatus(v.id)} title="Cliquer pour changer le statut">{st.label}</button>
+                  {Object.keys(v.stateDates || {}).length === 0 && (
+                    <button style={{ ...vidStyles.statusChip, color: st.color, background: st.bg }} onClick={() => cycleStatus(v.id)} title="Cliquer pour changer le statut">{st.label}</button>
+                  )}
+                  {Object.entries(v.stateDates || {}).map(([sid, d]) => {
+                    const s = statusOf(sid);
+                    return <button key={sid} style={{ ...vidStyles.statusChip, color: s.color, background: s.bg }} onClick={() => setPlan(p => ({ ...p, videos: p.videos.map(x => x.id === v.id ? { ...x, ...(cycleStateDatePatch(x, sid) || {}) } : x) }))} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
+                  })}
+                  <button style={vidStyles.addStateChip} onClick={() => setStateDatesId(v.id)} title="Gérer les états et leurs dates">+</button>
                   {vTags.map(t => <span key={t.id} style={{ ...vidStyles.tagChip, color: t.color, border: `1px solid ${t.color}` }}>{t.name}</span>)}
                   {v.date
                     ? <span style={vidStyles.dateTag} className="mono">📅 {v.date.slice(8)}/{v.date.slice(5, 7)}/{v.date.slice(0, 4)}</span>
                     : <span style={{ ...vidStyles.dateTag, fontStyle: "italic" }}>sans date</span>}
                 </div>
               </div>
+              <button style={{ ...vidStyles.remove, fontSize: 13, lineHeight: 1 }} onClick={() => { if (confirmSendToIdeas(v)) { if (sendVideoToIdeas(v)) setPlan(p => ({ ...p, videos: p.videos.filter(x => x.id !== v.id) })); } }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>
               <button className="obj-remove-btn" style={vidStyles.remove} onClick={() => { if (confirm(`Supprimer « ${v.title} » ?`)) removeVideo(v.id); }} aria-label="Supprimer" title="Supprimer"><Icon.Trash /></button>
             </div>
           );
@@ -197,6 +207,13 @@ function VideosPage({ plan, setPlan }) {
         <NewVideoModal tags={tags} onCreate={createVideo} onClose={() => setNewVideoModal(false)} />
       )}
 
+      {stateDatesVideo && (
+        <StateDatesModal
+          video={stateDatesVideo}
+          onClose={() => setStateDatesId(null)}
+          onUpdate={(patch) => setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === stateDatesVideo.id ? { ...v, ...patch } : v) }))} />
+      )}
+
       {detailVideo && (
         <VideoDetailModal
           video={detailVideo}
@@ -237,6 +254,7 @@ const vidStyles = {
   rowTitle: { display: "block", width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 600, textAlign: "left", padding: 0, lineHeight: 1.35, cursor: "pointer" },
   rowMeta: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" },
   statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer" },
+  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", lineHeight: 1.4 },
   tagChip: { fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: "transparent" },
   dateTag: { color: "var(--muted)", fontSize: 10.5 },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 6, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },

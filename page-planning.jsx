@@ -39,6 +39,37 @@ const DEFAULT_EVENTS = [
   { id: "e9", name: "Fête de la musique", start: "2027-06-21", end: "2027-06-21", remind: 14 },
 ];
 function statusOf(id) { return PLAN_STATUSES.find(s => s.id === id) || PLAN_STATUSES[0]; }
+// Patch immutable pour poser/effacer la date d'un état donné.
+// video.date (date de publication, utilisée par stats/objectifs/archives) reste synchronisée sur publiee puis publier.
+function stateDatePatch(video, stateId, day) {
+  const sd = { ...(video.stateDates || {}) };
+  if (day) sd[stateId] = day; else delete sd[stateId];
+  return { stateDates: sd, date: sd.publiee || sd.publier || null };
+}
+// États associés à une vidéo : état courant + tous les états datés
+function videoStates(v) {
+  return [v.status, ...Object.keys(v.stateDates || {})];
+}
+// Fait passer une entrée datée à l'état suivant LIBRE (jamais d'écrasement d'un état déjà daté) ; le statut interne = état le plus avancé
+function cycleStateDatePatch(video, sid) {
+  const sd = { ...(video.stateDates || {}) };
+  const d = sd[sid];
+  if (!d) return null;
+  delete sd[sid];
+  const n = PLAN_STATUSES.length;
+  let i = PLAN_STATUSES.findIndex(s => s.id === sid);
+  let next = null;
+  for (let step = 1; step < n; step++) {
+    const cand = PLAN_STATUSES[(i + step) % n].id;
+    if (!sd[cand]) { next = cand; break; }
+  }
+  if (!next) return null; // tous les autres états sont déjà datés : on ne bouge pas
+  sd[next] = d;
+  const order = PLAN_STATUSES.map(s => s.id);
+  const keys = Object.keys(sd);
+  const status = keys.length ? keys.sort((a, b) => order.indexOf(b) - order.indexOf(a))[0] : video.status;
+  return { stateDates: sd, status, date: sd.publiee || sd.publier || null };
+}
 
 function planPad2(n) { return String(n).padStart(2, "0"); }
 function planToday() { const d = new Date(); return d.getFullYear() + "-" + planPad2(d.getMonth() + 1) + "-" + planPad2(d.getDate()); }
@@ -62,6 +93,14 @@ function loadPlan() {
     if (!p || !Array.isArray(p.videos)) return base;
     // migration des anciens statuts + des plans sans événements
     p.videos = p.videos.map(v => PLAN_STATUS_MIGRATION[v.status] ? { ...v, status: PLAN_STATUS_MIGRATION[v.status] } : v);
+    // migration : date unique → dates par état
+    p.videos = p.videos.map(v => {
+      if (v.date && !v.stateDates) {
+        const key = ["publier", "publiee"].includes(v.status) ? v.status : "publiee";
+        return { ...v, stateDates: { [key]: v.date } };
+      }
+      return v;
+    });
     if (!Array.isArray(p.events)) p.events = DEFAULT_EVENTS;
     if (!Array.isArray(p.tags) || p.tagsVersion !== TAGS_VERSION) {
       p.tags = DEFAULT_TAGS;
@@ -104,7 +143,16 @@ function PlanningPage({ plan, setPlan }) {
   const events = plan.events || [];
   const [editEventId, setEditEventId] = useState(null);
   const editEvent = events.find(e => e.id === editEventId) || null;
-  const addEvent = () => { setEvOpen(true); const id = uid(); setPlan(p => ({ ...p, events: [{ id, name: "", start: planToday(), end: planToday(), remind: 14 }, ...(p.events || [])] })); setEditEventId(id); };
+  const newEventIdRef = useRef(null);
+  const closeEventModal = () => {
+    const ev = events.find(e => e.id === editEventId);
+    if (ev && !(ev.name || "").trim()) {
+      removeEvent(ev.id);
+    }
+    newEventIdRef.current = null;
+    setEditEventId(null);
+  };
+  const addEvent = () => { setEvOpen(true); const id = uid(); newEventIdRef.current = id; setPlan(p => ({ ...p, events: [{ id, name: "", start: planToday(), end: planToday(), remind: 14 }, ...(p.events || [])] })); setEditEventId(id); };
   const patchEvent = (id, patch) => setPlan(p => ({ ...p, events: (p.events || []).map(e => e.id === id ? { ...e, ...patch } : e) }));
   const removeEvent = (id) => setPlan(p => ({ ...p, events: (p.events || []).filter(e => e.id !== id) }));
 
@@ -125,12 +173,13 @@ function PlanningPage({ plan, setPlan }) {
   const cells = useMemo(() => monthCells(plan.month), [plan.month]);
   const today = planToday();
 
-  // Actives = sans date ou datées d'aujourd'hui/futur (l'historique complet est dans la page Vidéos).
   const [listStFilter, setListStFilter] = useState([]);
   const [listQuery, setListQuery] = useState("");
   const toggleListSt = (id) => setListStFilter(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
   const lq = listQuery.trim().toLowerCase();
-  const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today) && (listStFilter.length === 0 || listStFilter.includes(v.status)) && (!lq || v.title.toLowerCase().includes(lq)));
+  // Visibles = sans date, datées d'aujourd'hui/futur, ou passées mais pas encore publiées (en retard).
+  // Seules les vidéos publiées à date passée sortent de la liste (historique dans la page Vidéos).
+  const activeVideos = plan.videos.filter(v => (!v.date || v.date >= today || v.status !== "publiee") && (listStFilter.length === 0 || listStFilter.some(id => videoStates(v).includes(id))) && (!lq || v.title.toLowerCase().includes(lq)));
   // Tri par état : Collab confirmée → À tourner → À monter → À publier → À contacter → Publiée (stable : l'ordre manuel est conservé au sein d'un même état)
   const STATUS_ORDER = { confirmee: 0, tourner: 1, monter: 2, publier: 3, contacter: 4, publiee: 5 };
   const sortedVideos = [...activeVideos].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
@@ -154,16 +203,44 @@ function PlanningPage({ plan, setPlan }) {
   const editTitle = (id, title) => setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === id ? { ...v, title } : v) }));
   const updateVideo = (id, patch) => setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === id ? { ...v, ...patch } : v) }));
   const [detailId, setDetailId] = useState(null);
+  const [stateDatesId, setStateDatesId] = useState(null);
+  const stateDatesVideo = plan.videos.find(v => v.id === stateDatesId) || null;
   const detailVideo = plan.videos.find(v => v.id === detailId) || null;
-  const scheduleVideo = (id, date) => { setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === id ? { ...v, date } : v) })); setSelectedId(null); };
+  // pose la date de l'état stateId (par défaut : l'état courant de la vidéo)
+  const scheduleVideo = (id, date, stateId) => {
+    setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === id ? { ...v, ...stateDatePatch(v, stateId || v.status, date) } : v) }));
+    setSelectedId(null);
+  };
 
   const onDropDay = (e, day) => {
     e.preventDefault();
     setDragOverDay(null);
-    const id = e.dataTransfer.getData("text/plain");
-    if (id) scheduleVideo(id, day);
+    const raw = e.dataTransfer.getData("text/plain");
+    if (!raw) return;
+    const [id, stateId] = raw.split("|");
+    if (id) scheduleVideo(id, day, stateId || undefined);
   };
-  const onDayClick = (day) => { if (selectedId) scheduleVideo(selectedId, day); };
+  const onDayClick = (day) => {
+    if (selectedId) { scheduleVideo(selectedId, day); return; }
+    setDayChooser(day);
+  };
+  // popup de création au clic sur un jour
+  const [dayChooser, setDayChooser] = useState(null);
+  const createVideoOnDay = ({ title, tags, openDetail }) => {
+    const id = uid();
+    setPlan(p => ({ ...p, videos: [...p.videos, { id, title, status: "contacter", tags, ...stateDatePatch({}, "contacter", dayChooser) }] }));
+    setDayChooser(null);
+    if (openDetail) setDetailId(id);
+  };
+  const createEventOnDay = () => {
+    const id = uid();
+    newEventIdRef.current = id;
+    setPlan(p => ({ ...p, events: [{ id, name: "", start: dayChooser, end: dayChooser, remind: 14 }, ...(p.events || [])] }));
+    setDayChooser(null);
+    setEvOpen(true);
+    setEditEventId(id);
+  };
+  const [newVideoOnDay, setNewVideoOnDay] = useState(false);
 
   return (
     <div>
@@ -205,11 +282,14 @@ function PlanningPage({ plan, setPlan }) {
                 <VideoRow key={v.id} video={v} st={st} isSel={isSel}
                   onSelect={() => setSelectedId(isSel ? null : v.id)}
                   onCycle={() => cycleStatus(v.id)}
+                  onCycleState={(sid) => setPlan(p => ({ ...p, videos: p.videos.map(x => x.id === v.id ? { ...x, ...(cycleStateDatePatch(x, sid) || {}) } : x) }))}
+                  onAddState={() => setStateDatesId(v.id)}
                   onRemove={() => removeVideo(v.id)}
                   onEdit={(t) => editTitle(v.id, t)}
                   onDetail={() => setDetailId(v.id)}
                   onDragStartRow={() => { dragVideoRef.current = v.id; }}
                   onDropRow={() => { moveVideo(dragVideoRef.current, v.id); dragVideoRef.current = null; }}
+                  onSendToIdeas={(vd) => { if (sendVideoToIdeas(vd)) setPlan(p => ({ ...p, videos: p.videos.filter(x => x.id !== vd.id) })); }}
                   onUnschedule={() => scheduleVideo(v.id, null)} />
               );
             })}
@@ -256,7 +336,9 @@ function PlanningPage({ plan, setPlan }) {
           <div style={planStyles.calGrid}>
             {cells.map((day, i) => {
               if (!day) return <div key={i} style={planStyles.cellEmpty}></div>;
-              const dayVideos = plan.videos.filter(v => v.date === day);
+              const dayVideos = plan.videos.flatMap(v =>
+                Object.entries(v.stateDates || {}).filter(([, d]) => d === day).map(([sid]) => ({ v, sid }))
+              );
               const isToday = day === today;
               const isOver = dragOverDay === day;
               return (
@@ -276,16 +358,16 @@ function PlanningPage({ plan, setPlan }) {
                     {events.filter(ev => ev.name && ev.start && day >= ev.start && day <= (ev.end || ev.start)).map(ev => (
                       <div key={ev.id} style={planStyles.evBand} title={ev.name}>{ev.name}</div>
                     ))}
-                    {dayVideos.map(v => {
-                      const st = statusOf(v.status);
+                    {dayVideos.map(({ v, sid }) => {
+                      const st = statusOf(sid);
                       return (
-                        <div key={v.id} draggable
-                          onDragStart={(e) => e.dataTransfer.setData("text/plain", v.id)}
+                        <div key={v.id + sid} draggable
+                          onDragStart={(e) => e.dataTransfer.setData("text/plain", v.id + "|" + sid)}
                           onClick={(e) => { e.stopPropagation(); setDetailId(v.id); }}
                           style={{ ...planStyles.chip, color: st.color, background: st.bg }}
                           title={`${v.title} — ${st.label} · clic : détail`}>
                           <span style={planStyles.chipText}>{v.title}</span>
-                          <button style={planStyles.chipX} onClick={(e) => { e.stopPropagation(); scheduleVideo(v.id, null); }} aria-label="Déplanifier" title="Retirer du calendrier">×</button>
+                          <button style={planStyles.chipX} onClick={(e) => { e.stopPropagation(); scheduleVideo(v.id, null, sid); }} aria-label="Déplanifier" title="Retirer du calendrier">×</button>
                         </div>
                       );
                     })}
@@ -302,8 +384,34 @@ function PlanningPage({ plan, setPlan }) {
         </div>
       </div>
 
+      {dayChooser && !newVideoOnDay && (
+        <div style={planStyles.overlay}>
+          <div style={{ ...planStyles.modal, width: "min(360px, 100%)" }} role="dialog" aria-label="Créer sur ce jour">
+            <div style={planStyles.modalHead}>
+              <div style={planStyles.modalTitle} className="display">{(() => { const d = new Date(dayChooser + "T12:00:00"); return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); })()}</div>
+              <button style={planStyles.modalClose} onClick={() => setDayChooser(null)} aria-label="Fermer">×</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button style={planStyles.newVideoValidate} onClick={() => setNewVideoOnDay(true)}>🎬 Créer une vidéo ce jour</button>
+              <button style={{ ...planStyles.newVideoValidate, background: "transparent", border: `1px solid ${EV_COLOR}`, color: EV_COLOR, marginTop: 0 }} onClick={createEventOnDay}>🗓️ Créer un événement ce jour</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dayChooser && newVideoOnDay && (
+        <NewVideoModal tags={plan.tags || []} onCreate={(v) => { createVideoOnDay(v); setNewVideoOnDay(false); }} onClose={() => { setNewVideoOnDay(false); setDayChooser(null); }} />
+      )}
+
       {newVideoModal && (
         <NewVideoModal tags={plan.tags || []} onCreate={createVideo} onClose={() => setNewVideoModal(false)} />
+      )}
+
+      {stateDatesVideo && (
+        <StateDatesModal
+          video={stateDatesVideo}
+          onClose={() => setStateDatesId(null)}
+          onUpdate={(patch) => setPlan(p => ({ ...p, videos: p.videos.map(v => v.id === stateDatesVideo.id ? { ...v, ...patch } : v) }))} />
       )}
 
       {detailVideo && (
@@ -317,14 +425,14 @@ function PlanningPage({ plan, setPlan }) {
       {editEvent && (
         <EventDetailModal
           event={editEvent}
-          onClose={() => setEditEventId(null)}
+          onClose={closeEventModal}
           onUpdate={(patch) => patchEvent(editEvent.id, patch)} />
       )}
     </div>
   );
 }
 
-function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDetail, onUnschedule, onDragStartRow, onDropRow }) {
+function VideoRow({ video, st, isSel, onSelect, onCycle, onCycleState, onAddState, onRemove, onEdit, onDetail, onUnschedule, onDragStartRow, onDropRow, onSendToIdeas }) {
   const [isEditing, setEditing] = useState(false);
   return (
     <li className="obj-row" draggable={!isEditing}
@@ -343,16 +451,18 @@ function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDet
           <button style={planStyles.rowTitle} onClick={onSelect} onDoubleClick={() => setEditing(true)} title="Clic : sélectionner pour planifier · double-clic : renommer">{video.title}</button>
         )}
         <div style={planStyles.rowMeta}>
-          <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={onCycle} title="Cliquer pour changer le statut">{st.label}</button>
-          {video.date && (
-            <span style={planStyles.dateTag} className="mono">
-              📅 {video.date.slice(8)}/{video.date.slice(5, 7)}
-              <button style={planStyles.chipX} onClick={onUnschedule} aria-label="Déplanifier" title="Retirer du calendrier">×</button>
-            </span>
+          {Object.keys(video.stateDates || {}).length === 0 && (
+            <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={onCycle} title="Cliquer pour changer le statut">{st.label}</button>
           )}
+          {Object.entries(video.stateDates || {}).map(([sid, d]) => {
+            const s = statusOf(sid);
+            return <button key={sid} style={{ ...planStyles.statusChip, color: s.color, background: s.bg }} onClick={() => onCycleState(sid)} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
+          })}
+          <button style={planStyles.addStateChip} onClick={onAddState} title="Gérer les états et leurs dates">+</button>
         </div>
       </div>
       <button style={planStyles.detailBtn} onClick={onDetail} aria-label="Détail de la vidéo" title="Scripts, descriptions & message CM">📄</button>
+      {onSendToIdeas && <button style={planStyles.detailBtn} onClick={() => { if (confirmSendToIdeas(video)) onSendToIdeas(video); }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>}
       <button className="obj-remove-btn" style={planStyles.remove} onClick={onRemove} aria-label="Supprimer" title="Supprimer">
         <Icon.Trash />
       </button>
@@ -360,21 +470,23 @@ function VideoRow({ video, st, isSel, onSelect, onCycle, onRemove, onEdit, onDet
   );
 }
 
-// Toast global « Sauvegardé ✓ » affiché à la fermeture des popups
-function showSavedToast() {
+// Toast générique (bas de l'écran)
+function showToastMsg(text) {
   let el = document.getElementById("saved-toast");
   if (!el) {
     el = document.createElement("div");
     el.id = "saved-toast";
-    el.textContent = "Sauvegardé ✓";
     document.body.appendChild(el);
   }
+  el.textContent = text;
   el.classList.remove("show");
   void el.offsetWidth;
   el.classList.add("show");
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove("show"), 1800);
+  el._t = setTimeout(() => el.classList.remove("show"), 2200);
 }
+// Toast « Sauvegardé ✓ » affiché à la fermeture des popups
+function showSavedToast() { showToastMsg("Sauvegardé ✓"); }
 
 function cmProposal(video) {
   if (video.date) {
@@ -398,6 +510,7 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
   const descKey = lang === "FR" ? "descFR" : "descENG";
   const proposal = cmProposal(video);
   const [copied, setCopied] = useState(false);
+  const [showStates, setShowStates] = useState(false);
   const copy = (text) => {
     copyText(text);
     setCopied(true);
@@ -410,11 +523,14 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
           <div style={{ minWidth: 0 }}>
             <div style={planStyles.modalTitle} className="display">{video.title}</div>
             <div style={planStyles.rowMeta}>
-              <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={() => { const i = PLAN_STATUSES.findIndex(s => s.id === video.status); onUpdate({ status: PLAN_STATUSES[(i + 1) % PLAN_STATUSES.length].id }); }} title="Cliquer pour changer l'état">{st.label}</button>
-              <label style={planStyles.modalDateWrap} title="Date de publication planifiée">
-                📅 <input type="date" value={video.date || ""} onChange={(e) => onUpdate({ date: e.target.value || null })} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={planStyles.modalDateInput} />
-              </label>
-              {video.date && <button style={planStyles.modalDateClear} onClick={() => onUpdate({ date: null })} title="Déplanifier">×</button>}
+              {Object.keys(video.stateDates || {}).length === 0 && (
+                <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={() => { const i = PLAN_STATUSES.findIndex(s => s.id === video.status); onUpdate({ status: PLAN_STATUSES[(i + 1) % PLAN_STATUSES.length].id }); }} title="Cliquer pour changer l'état">{st.label}</button>
+              )}
+              {Object.entries(video.stateDates || {}).map(([sid, d]) => {
+                const s = statusOf(sid);
+                return <button key={sid} style={{ ...planStyles.statusChip, color: s.color, background: s.bg }} onClick={() => onUpdate(cycleStateDatePatch(video, sid) || {})} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
+              })}
+              <button style={planStyles.addStateChip} onClick={() => setShowStates(true)} title="Gérer les états et leurs dates">+</button>
             </div>
           </div>
           <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
@@ -459,9 +575,16 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
             <TagPicker tags={tags} selected={video.tags || []} onToggle={(id) => onUpdate({ tags: (video.tags || []).includes(id) ? (video.tags || []).filter(x => x !== id) : [...(video.tags || []), id] })} />
           </div>
         )}
+
       </div>
+      {showStates && <StateDatesModal video={video} onUpdate={onUpdate} onClose={() => setShowStates(false)} />}
     </div>
   );
+}
+
+// Confirmation commune avant renvoi en Idées
+function confirmSendToIdeas(video) {
+  return confirm(`Renvoyer « ${video.title} » dans les Idées ?\n\nLa vidéo sera supprimée du Planning : étiquettes, date, statut, traduction ENG, description et idées de story seront PERDUS. Seuls le titre et le script FR (en description) seront conservés.`);
 }
 
 // Popup express de création : titre + étiquettes, sans scroll
@@ -518,16 +641,24 @@ function EventDetailModal({ event, onClose: onCloseRaw, onUpdate }) {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 130 }}>
             <label style={planStyles.fieldLabel}>Date de début</label>
-            <input type="date" value={event.start || ""} onChange={(e) => onUpdate({ start: e.target.value })} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={{ ...planStyles.textarea, minHeight: 0, cursor: "pointer" }} />
+            <input type="date" value={event.start || ""} onChange={(e) => { const s = e.target.value; onUpdate(event.end && event.end < s ? { start: s, end: s } : { start: s }); }} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={{ ...planStyles.textarea, minHeight: 0, cursor: "pointer" }} />
           </div>
           <div style={{ flex: 1, minWidth: 130 }}>
             <label style={planStyles.fieldLabel}>Date de fin</label>
             <input type="date" value={event.end || ""} onChange={(e) => onUpdate({ end: e.target.value })} onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }} style={{ ...planStyles.textarea, minHeight: 0, cursor: "pointer" }} />
           </div>
         </div>
-        <label style={planStyles.fieldLabel}>Rappel (jours avant le début)</label>
-        <input type="number" min="0" max="365" value={event.remind == null ? 14 : event.remind} onChange={(e) => onUpdate({ remind: Math.max(0, +e.target.value || 0) })} style={{ ...planStyles.textarea, minHeight: 0, width: 110 }} />
-        <div style={planStyles.cmHint}>Le rappel s'affiche sur la page Objectifs à l'approche de l'événement.</div>
+        <label style={{ ...planStyles.fieldLabel, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={event.remindOn !== false} onChange={(e) => onUpdate({ remindOn: e.target.checked })} style={{ accentColor: "var(--pink)", width: 15, height: 15 }} />
+          Rappel activé
+        </label>
+        {event.remindOn !== false && (
+          <div>
+            <label style={planStyles.fieldLabel}>Rappel (jours avant le début)</label>
+            <input type="number" min="0" max="365" value={event.remind == null ? 14 : event.remind} onChange={(e) => onUpdate({ remind: Math.max(0, +e.target.value || 0) })} style={{ ...planStyles.textarea, minHeight: 0, width: 110 }} />
+            <div style={planStyles.cmHint}>Le rappel s'affiche sur la page Objectifs à l'approche de l'événement.</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -550,6 +681,44 @@ function TagPicker({ tags, selected = [], onToggle }) {
   );
 }
 
+// Popup états & dates d'une vidéo : chaque état peut recevoir une date
+function StateDatesModal({ video, onClose: onCloseRaw, onUpdate }) {
+  const onClose = React.useCallback(() => { showSavedToast(); onCloseRaw(); }, [onCloseRaw]);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+  return (
+    <div style={planStyles.overlay}>
+      <div style={{ ...planStyles.modal, width: "min(400px, 100%)" }} role="dialog" aria-label="États de la vidéo">
+        <div style={planStyles.modalHead}>
+          <div style={{ minWidth: 0 }}>
+            <div style={planStyles.modalTitle} className="display">{video.title}</div>
+            <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 3 }}>Associe une date à chaque état — les états datés apparaissent sur la carte et le calendrier</div>
+          </div>
+          <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {PLAN_STATUSES.map(s => {
+            const d = (video.stateDates || {})[s.id] || "";
+            return (
+              <div key={s.id} style={planStyles.stateModalRow}>
+                <span style={{ ...planStyles.statusChip, color: s.color, background: s.bg, cursor: "default" }}>{s.label}</span>
+                <input type="date" value={d}
+                  onChange={(e) => onUpdate(stateDatePatch(video, s.id, e.target.value || null))}
+                  onClick={(e) => { try { e.target.showPicker(); } catch (err) {} }}
+                  style={{ ...planStyles.stateDateInput, marginLeft: "auto" }} />
+                {d && <button style={planStyles.modalDateClear} onClick={() => onUpdate(stateDatePatch(video, s.id, null))} title="Retirer cette date">×</button>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const planStyles = {
   pageHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 22 },
   pageTitle: { fontSize: 32, fontWeight: 700, lineHeight: 1.1 },
@@ -563,6 +732,7 @@ const planStyles = {
   newVideoBtn: { background: "var(--pink)", border: "none", color: "#fff", fontSize: 13.5, fontWeight: 700, padding: "10px 18px", borderRadius: 11, cursor: "pointer", flexShrink: 0 },
   newVideoValidate: { marginTop: 14, width: "100%", background: "var(--pink)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, padding: "11px 14px", borderRadius: 11, cursor: "pointer" },
   newVideoFullLink: { marginTop: 8, width: "100%", background: "transparent", border: "none", color: "var(--muted)", fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: "4px 2px" },
+  backToIdeasBtn: { marginTop: 16, width: "100%", background: "transparent", border: "1px dashed var(--line-strong)", color: "var(--muted)", fontSize: 12.5, fontWeight: 600, padding: "9px 12px", borderRadius: 11, cursor: "pointer" },
   newTagRow: { display: "flex", flexWrap: "wrap", gap: 5, padding: "0 2px" },
   newTagChip: { fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 99, cursor: "pointer", transition: "all 0.12s" },
   tagGroupLabel: { color: "var(--muted-2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", margin: "0 0 4px 2px" },
@@ -578,6 +748,13 @@ const planStyles = {
   modalDateWrap: { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--muted)", fontSize: 11 },
   modalDateInput: { background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 7, color: "var(--text)", fontSize: 11.5, padding: "3px 6px", outline: "none", cursor: "pointer" },
   modalDateClear: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 14, cursor: "pointer", padding: "0 2px", lineHeight: 1 },
+  stateDatesGrid: { display: "flex", flexWrap: "wrap", gap: "6px 12px", marginTop: 8 },
+  stateDateItem: { display: "flex", flexDirection: "column", gap: 2 },
+  stateDateLabel: { fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" },
+  stateDateInput: { background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 7, color: "var(--text)", fontSize: 11, padding: "3px 6px", outline: "none", cursor: "pointer" },
+  stateDateAdd: { alignSelf: "flex-end", background: "var(--surface-2)", border: "1px dashed var(--line-strong)", borderRadius: 7, color: "var(--muted)", fontSize: 11, padding: "4px 6px", outline: "none", cursor: "pointer" },
+  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", lineHeight: 1.4 },
+  stateModalRow: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 11 },
   editInput: { width: "100%", background: "var(--bg)", border: "1px solid var(--pink)", borderRadius: 8, color: "var(--text)", fontSize: 13.5, padding: "5px 8px", outline: "none" },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 5, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   legendBox: { display: "flex", flexWrap: "wrap", gap: 5, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" },
@@ -634,4 +811,17 @@ const planStyles = {
   cmHint: { color: "var(--muted-2)", fontSize: 11, marginTop: 6 },
 };
 
-Object.assign(window, { PlanningPage, VideoDetailModal, NewVideoModal, TagPicker, PLAN_KEY, PLAN_STATUSES, TAG_COLORS, loadPlan, statusOf });
+Object.assign(window, { PlanningPage, VideoDetailModal, NewVideoModal, StateDatesModal, TagPicker, sendVideoToIdeas, confirmSendToIdeas, showToastMsg, stateDatePatch, videoStates, cycleStateDatePatch, PLAN_KEY, PLAN_STATUSES, TAG_COLORS, loadPlan, statusOf });
+
+// Renvoie une vidéo vers la page Idées : crée l'idée (titre + script FR en description) dans le localStorage des idées
+function sendVideoToIdeas(video) {
+  try {
+    const KEY = "miamstrat_ideas_v1";
+    let ideas = [];
+    try { const p = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(p)) ideas = p; } catch (e) {}
+    ideas.unshift({ id: uid(), title: video.title, text: video.scriptFR || "" });
+    localStorage.setItem(KEY, JSON.stringify(ideas));
+    showToastMsg(`« ${video.title} » renvoyée dans les Idées ✓`);
+    return true;
+  } catch (e) { return false; }
+}

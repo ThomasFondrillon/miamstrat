@@ -172,7 +172,7 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
 
   // rappels d'événements à venir (dans leur fenêtre de rappel)
   const eventReminders = ((plan && plan.events) || []).map(ev => {
-    if (!ev.name || !ev.start) return null;
+    if (!ev.name || !ev.start || ev.remindOn === false) return null;
     const d = Math.round((new Date(ev.start + "T12:00:00") - new Date(today + "T12:00:00")) / 86400000);
     const remind = ev.remind == null ? 14 : +ev.remind;
     if (d < 0 || d > remind) return null;
