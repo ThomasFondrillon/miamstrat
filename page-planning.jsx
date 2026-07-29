@@ -623,7 +623,7 @@ function NewVideoModal({ tags, onCreate, onClose }) {
 }
 
 function EventDetailModal({ event, onClose: onCloseRaw, onUpdate }) {
-  const onClose = React.useCallback(() => { showSavedToast(); onCloseRaw(); }, [onCloseRaw]);
+  const onClose = React.useCallback(() => { if ((event.name || "").trim()) showSavedToast(); onCloseRaw(); }, [onCloseRaw, event.name]);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);

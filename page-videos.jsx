@@ -151,9 +151,6 @@ function VideosPage({ plan, setPlan }) {
                   })}
                   <button style={vidStyles.addStateChip} onClick={() => setStateDatesId(v.id)} title="Gérer les états et leurs dates">+</button>
                   {vTags.map(t => <span key={t.id} style={{ ...vidStyles.tagChip, color: t.color, border: `1px solid ${t.color}` }}>{t.name}</span>)}
-                  {v.date
-                    ? <span style={vidStyles.dateTag} className="mono">📅 {v.date.slice(8)}/{v.date.slice(5, 7)}/{v.date.slice(0, 4)}</span>
-                    : <span style={{ ...vidStyles.dateTag, fontStyle: "italic" }}>sans date</span>}
                 </div>
               </div>
               <button style={{ ...vidStyles.remove, fontSize: 13, lineHeight: 1 }} onClick={() => { if (confirmSendToIdeas(v)) { if (sendVideoToIdeas(v)) setPlan(p => ({ ...p, videos: p.videos.filter(x => x.id !== v.id) })); } }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>
