@@ -91,9 +91,9 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
   });
   useEffect(() => { try { localStorage.setItem(DAILY_KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
   // popup de sélection à la première ouverture du jour
-  const [planModal, setPlanModal] = useState(null); // "today" | "tomorrow" | null
+  const [planModal, setPlanModal] = useState(null); // "today" | "tomorrow" | "defaults" | null
   useEffect(() => { if (data.promptSeen !== todayStr()) setPlanModal("today"); }, []);
-  const freshDefaults = () => DEFAULT_DAILIES.map(o => ({ ...o }));
+  const freshDefaults = () => (Array.isArray(data.defaultDailies) ? data.defaultDailies : DEFAULT_DAILIES).map(o => ({ ...o }));
 
   const today = todayStr();
   const checks = data.log[today] || {};
@@ -130,7 +130,8 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
   const tomorrow = nextDayStr(today);
   const tomorrowReady = data.nextFor === tomorrow && Array.isArray(data.nextDailies);
   const validatePlan = (items) => {
-    if (planModal === "tomorrow") setData(d => ({ ...d, nextFor: tomorrow, nextDailies: items }));
+    if (planModal === "defaults") setData(d => ({ ...d, defaultDailies: items }));
+    else if (planModal === "tomorrow") setData(d => ({ ...d, nextFor: tomorrow, nextDailies: items }));
     else setData(d => ({ ...d, dailies: items, promptSeen: today }));
     setPlanModal(null);
   };
@@ -277,6 +278,7 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
           <button style={{ ...opStyles.tomorrowBtn, ...(tomorrowReady ? opStyles.tomorrowBtnDone : {}) }} onClick={() => setPlanModal("tomorrow")}>
             {tomorrowReady ? "🌙 Objectifs de demain prêts ✓ — modifier" : "🌙 Choisir mes objectifs de demain"}
           </button>
+          <button style={opStyles.defaultsBtn} onClick={() => setPlanModal("defaults")} title="Modifier la liste proposée chaque jour">⚙ Modifier la liste par défaut</button>
           {allDone && (
             <div style={opStyles.congrats}>🎉 Journée complète ! Bonus de série ce soir : <b>+{25 * (data.streak + 1)} pts</b></div>
           )}
@@ -310,7 +312,7 @@ function ObjectifsPage({ strat, setStrat, plan, setPlan, tweaks = {}, onOpenStra
       {planModal && (
         <DailyPlanModal
           mode={planModal}
-          initial={planModal === "tomorrow" ? (tomorrowReady ? data.nextDailies : freshDefaults()) : (data.promptSeen === today ? data.dailies : freshDefaults())}
+          initial={planModal === "defaults" ? freshDefaults() : planModal === "tomorrow" ? (tomorrowReady ? data.nextDailies : freshDefaults()) : (data.promptSeen === today ? data.dailies : freshDefaults())}
           onValidate={validatePlan}
           onClose={closePlan} />
       )}
@@ -328,13 +330,14 @@ function DailyPlanModal({ mode, initial, onValidate, onClose }) {
   }, [onClose]);
   const add = () => { const t = txt.trim(); if (!t) return; setItems(a => [...a, { id: uid(), text: t }]); setTxt(""); };
   const isTomorrow = mode === "tomorrow";
+  const isDefaults = mode === "defaults";
   return (
     <div style={opStyles.overlay}>
-      <div style={opStyles.modal} role="dialog" aria-label={isTomorrow ? "Objectifs de demain" : "Objectifs du jour"}>
+      <div style={opStyles.modal} role="dialog" aria-label={isDefaults ? "Liste par défaut" : isTomorrow ? "Objectifs de demain" : "Objectifs du jour"}>
         <div style={opStyles.modalHead}>
           <div>
-            <div style={opStyles.modalTitle} className="display">{isTomorrow ? "🌙 Objectifs de demain" : "☀️ Tes objectifs du jour"}</div>
-            <div style={opStyles.modalSub}>{isTomorrow ? "Prépare ta journée de demain — la popup ne s'affichera pas au réveil" : "Ajuste ta liste avant de commencer la journée"}</div>
+            <div style={opStyles.modalTitle} className="display">{isDefaults ? "⚙ Liste par défaut" : isTomorrow ? "🌙 Objectifs de demain" : "☀️ Tes objectifs du jour"}</div>
+            <div style={opStyles.modalSub}>{isDefaults ? "Cette liste sera proposée chaque jour dans la popup" : isTomorrow ? "Prépare ta journée de demain — la popup ne s'affichera pas au réveil" : "Ajuste ta liste avant de commencer la journée"}</div>
           </div>
           <button style={opStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
         </div>
@@ -352,7 +355,7 @@ function DailyPlanModal({ mode, initial, onValidate, onClose }) {
           <button style={opStyles.addBtn} onClick={add} disabled={!txt.trim()}>+ Ajouter</button>
         </div>
         <button style={opStyles.planValidate} onClick={() => onValidate(items)}>
-          {isTomorrow ? "Valider pour demain ✓" : "C'est parti ! ✓"}
+          {isDefaults ? "Enregistrer la liste ✓" : isTomorrow ? "Valider pour demain ✓" : "C'est parti ! ✓"}
         </button>
       </div>
     </div>
@@ -440,6 +443,7 @@ const opStyles = {
   legend: { marginTop: 18, color: "var(--muted-2)", fontSize: 11.5, lineHeight: 1.5, textAlign: "center", maxWidth: 720, marginLeft: "auto", marginRight: "auto" },
   tomorrowBtn: { marginTop: 10, width: "100%", background: "transparent", border: "1px dashed var(--line-strong)", color: "var(--muted)", fontSize: 13, fontWeight: 600, padding: "10px 12px", borderRadius: 12, cursor: "pointer" },
   tomorrowBtnDone: { border: "1px solid var(--green)", color: "var(--green)", background: "var(--green-soft)" },
+  defaultsBtn: { marginTop: 6, background: "transparent", border: "none", color: "var(--muted-2)", fontSize: 11.5, textDecoration: "underline", cursor: "pointer", padding: "2px 4px", alignSelf: "center" },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 },
   modal: { width: "min(520px, 100%)", maxHeight: "88vh", overflowY: "auto", background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 20, padding: "20px 20px 18px", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" },
   modalHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 },
