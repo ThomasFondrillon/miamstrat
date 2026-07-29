@@ -35,7 +35,8 @@ function StatsPage({ plan }) {
   const trend = last4w > prev4w ? "↗" : last4w < prev4w ? "↘" : "→";
   const trendColor = last4w > prev4w ? "var(--green)" : last4w < prev4w ? "#ff6b6b" : "var(--muted)";
   const late = videos.filter(v => v.date && v.date < todayStr2 && v.status !== "publiee").length;
-  const stock = videos.filter(v => ["monter", "publier"].includes(v.status)).length;
+  // stock = à publier + publiées planifiées après aujourd'hui (publication auto à venir)
+  const stock = videos.filter(v => v.status === "publier" || (v.status === "publiee" && v.date && v.date > todayStr2)).length;
   const stockWeeks = rate > 0 ? (stock / rate) : null;
 
   // ─── stats étiquettes (vidéos publiées) ───
@@ -108,7 +109,7 @@ function StatsPage({ plan }) {
             </div>
             <div>
               <div style={stStyles.miniKpiLabel}>Stock</div>
-              <div style={stStyles.miniKpiSub}>à monter + à publier{stockWeeks != null ? ` · ≈ ${stockWeeks.toFixed(1).replace(".", ",")} sem. d'avance` : ""}</div>
+              <div style={stStyles.miniKpiSub}>à publier + planifiées à venir{stockWeeks != null ? ` · ≈ ${stockWeeks.toFixed(1).replace(".", ",")} sem. d'avance` : ""}</div>
             </div>
           </div>
         </div>
