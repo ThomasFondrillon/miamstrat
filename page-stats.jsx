@@ -23,7 +23,9 @@ function StatsPage({ plan }) {
   const byStatus = PLAN_STATUSES.map(s => ({ st: s, count: videos.filter(v => v.status === s.id).length })).filter(x => x.count > 0);
   const totalVideos = videos.length;
   const inProgress = videos.filter(v => ["tourner", "monter", "publier"].includes(v.status)).length;
-  const todayStr2 = new Date().toISOString().slice(0, 10);
+  // date locale (pas UTC) pour comparer aux dates du calendrier
+  const _n = new Date();
+  const todayStr2 = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, "0")}-${String(_n.getDate()).padStart(2, "0")}`;
   const upcoming = videos.filter(v => v.date && v.date >= todayStr2 && v.status !== "publiee").length;
 
   // ─── KPI développement ───

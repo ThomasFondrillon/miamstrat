@@ -19,6 +19,9 @@ function IdeasPage({ onSendToPlan }) {
   const [ideas, setIdeas] = useState(loadIdeas);
   useEffect(() => { try { localStorage.setItem(IDEAS_KEY, JSON.stringify(ideas)); } catch (e) {} }, [ideas]);
   const [toast, setToast] = useState(null);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const shownIdeas = ideas.filter(i => !q || i.text.toLowerCase().includes(q));
 
   const addIdea = () => setIdeas(l => [{ id: uid(), text: "" }, ...l]);
   const patchIdea = (id, text) => setIdeas(l => l.map(i => i.id === id ? { ...i, text } : i));
@@ -43,8 +46,9 @@ function IdeasPage({ onSendToPlan }) {
         <button style={ideaStyles.addBtn} onClick={addIdea}>+ Nouvelle idée</button>
       </div>
       {toast && <div style={ideaStyles.toast}>{toast}</div>}
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher une idée…" style={ideaStyles.search} />
       <div className="msg-grid" style={ideaStyles.grid}>
-        {ideas.map(idea => (
+        {shownIdeas.map(idea => (
           <div key={idea.id} style={ideaStyles.card}>
             <textarea
               value={idea.text}
@@ -67,6 +71,7 @@ function IdeasPage({ onSendToPlan }) {
           </div>
         ))}
         {ideas.length === 0 && <div style={ideaStyles.empty}>Aucune idée pour l'instant. Note la prochaine qui te passe par la tête ↑</div>}
+        {ideas.length > 0 && shownIdeas.length === 0 && <div style={ideaStyles.empty}>Aucun résultat pour cette recherche</div>}
       </div>
     </div>
   );
@@ -76,6 +81,7 @@ const ideaStyles = {
   pageHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 22, flexWrap: "wrap", gap: 12 },
   pageTitle: { fontSize: 32, fontWeight: 700, lineHeight: 1.1 },
   pageSub: { color: "var(--muted)", fontSize: 14, marginTop: 4 },
+  search: { display: "block", width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 11, color: "var(--text)", fontSize: 14, padding: "10px 13px", outline: "none", marginBottom: 14 },
   addBtn: { background: "var(--pink)", border: "none", color: "#fff", fontSize: 13.5, fontWeight: 600, padding: "10px 18px", borderRadius: 11, cursor: "pointer" },
   toast: { marginBottom: 14, padding: "10px 16px", background: "var(--green-soft)", border: "1px solid var(--green)", borderRadius: 12, color: "var(--green)", fontSize: 13.5 },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14, alignItems: "start" },
