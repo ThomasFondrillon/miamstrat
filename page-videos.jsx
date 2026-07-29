@@ -18,6 +18,13 @@ function VideosPage({ plan, setPlan }) {
   };
   const [newTag, setNewTag] = useState("");
   const [tagsOpen, setTagsOpen] = useState(false);
+  // cible de l'insertion d'emoji : "new" (champ nouvelle étiquette) ou l'id d'une étiquette en édition
+  const [emojiTarget, setEmojiTarget] = useState("new");
+  const renameTag = (id, name) => setPlan(p => ({ ...p, tags: (p.tags || []).map(t => t.id === id ? { ...t, name } : t) }));
+  const insertEmoji = (e) => {
+    if (emojiTarget === "new") setNewTag(v => v + e);
+    else { const t = tags.find(x => x.id === emojiTarget); if (t) renameTag(emojiTarget, t.name + e); else setNewTag(v => v + e); }
+  };
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const detailVideo = videos.find(v => v.id === detailId) || null;
 
@@ -161,16 +168,27 @@ function VideosPage({ plan, setPlan }) {
               onDragStart={(e) => { e.dataTransfer.setData("text/plain", t.id); tagDragRef.current = i; }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); moveTag(tagDragRef.current, i); tagDragRef.current = null; }}
-              style={{ ...vidStyles.tagManageChip, color: t.color, border: `1px solid ${t.color}`, cursor: "grab" }} title="Glisser pour réorganiser">
-              {t.name}
+              style={{ ...vidStyles.tagManageChip, color: t.color, border: `1px solid ${t.color}`, cursor: "grab" }} title="Glisser pour réorganiser · cliquer pour renommer">
+              <input value={t.name} size={Math.max(2, [...t.name].length)}
+                onFocus={() => setEmojiTarget(t.id)}
+                onChange={(e) => renameTag(t.id, e.target.value)}
+                style={vidStyles.tagNameInput} />
               <button style={vidStyles.tagX} onClick={() => removeTag(t.id)} aria-label={`Supprimer ${t.name}`} title="Supprimer l'étiquette">×</button>
             </span>
           ))}
           {tags.length === 0 && <span style={{ color: "var(--muted)", fontSize: 13, fontStyle: "italic" }}>Aucune étiquette</span>}
         </div>
         <div style={vidStyles.tagAddRow}>
-          <input value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTag(); }} placeholder="Nouvelle étiquette…" style={vidStyles.tagInput} />
+          <input value={newTag} onFocus={() => setEmojiTarget("new")} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTag(); }} placeholder="Nouvelle étiquette…" style={vidStyles.tagInput} />
           <button style={vidStyles.tagAddBtn} onClick={addTag} disabled={!newTag.trim()}>+ Ajouter</button>
+        </div>
+        <div>
+          <div style={vidStyles.emojiLabel}>Emojis — clique pour ajouter au nom {emojiTarget === "new" ? "de la nouvelle étiquette" : `de « ${(tags.find(t => t.id === emojiTarget) || {}).name || "…"} »`}</div>
+          <div style={vidStyles.emojiGrid}>
+            {TAG_EMOJIS.map(e => (
+              <button key={e} style={vidStyles.emojiBtn} onMouseDown={(ev) => ev.preventDefault()} onClick={() => insertEmoji(e)}>{e}</button>
+            ))}
+          </div>
         </div>
         </div>}
       </div>
@@ -189,6 +207,16 @@ function VideosPage({ plan, setPlan }) {
     </div>
   );
 }
+
+const TAG_EMOJIS = [
+  "🍽️", "🍴", "☕", "🥐", "🥖", "🍞", "🧀", "🍷", "🍸", "🍾", "🍕", "🍜", "🍣", "🍲", "🥘", "🍰", "🧁", "🍦", "🍓", "🫐",
+  "🏛️", "⛪", "🗼", "🏰", "🏨", "🏬", "🎨", "🖼️", "🎭", "🎪", "🎡", "🎶", "🎤", "🎬", "📸",
+  "✈️", "🚆", "🚇", "🚕", "🚲", "🛴", "⛵", "🚢", "🌍", "🗺️", "🧳", "🏖️", "⛺", "🏔️",
+  "🌳", "🌸", "🌻", "🍂", "❄️", "☀️", "🌧️", "🌈", "🌙", "⭐", "🔥", "💫",
+  "❤️", "💕", "🥰", "🎉", "🎁", "🎈", "💍", "👑", "💎", "🎀",
+  "👶", "👫", "👯", "👪", "🐶", "🐱", "🦦",
+  "💰", "💸", "🏷️", "🛒", "👜", "👗", "💄", "🧖", "🏋️", "⚽", "🎾", "🏆", "🎯", "🎲", "📚", "✍️", "💡", "📌",
+];
 
 const vidStyles = {
   pageHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 20 },
@@ -220,6 +248,10 @@ const vidStyles = {
   tagTitle: { fontSize: 15, fontWeight: 700 },
   tagList: { display: "flex", flexWrap: "wrap", gap: 6 },
   tagManageChip: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "4px 6px 4px 11px", borderRadius: 99 },
+  tagNameInput: { background: "transparent", border: "none", color: "inherit", fontSize: 12, fontWeight: 600, padding: 0, outline: "none", minWidth: 18, width: "auto", fieldSizing: "content" },
+  emojiLabel: { color: "var(--muted)", fontSize: 10.5, fontWeight: 600, marginBottom: 6 },
+  emojiGrid: { display: "flex", flexWrap: "wrap", gap: 2, maxHeight: 120, overflowY: "auto", padding: 4, background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 11 },
+  emojiBtn: { background: "transparent", border: "none", fontSize: 18, lineHeight: 1, padding: "4px 5px", borderRadius: 7, cursor: "pointer" },
   tagX: { background: "transparent", border: "none", color: "inherit", opacity: 0.7, fontSize: 14, cursor: "pointer", padding: "0 3px", lineHeight: 1 },
   tagAddRow: { display: "flex", gap: 6, padding: 3, background: "var(--surface-2)", border: "1px dashed var(--line-strong)", borderRadius: 11, maxWidth: 480, flexWrap: "wrap" },
   tagSelect: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 8, color: "var(--text)", fontSize: 12, padding: "6px 8px", outline: "none" },
