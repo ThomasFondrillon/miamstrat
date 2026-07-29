@@ -9,6 +9,13 @@ function VideosPage({ plan, setPlan }) {
   const [stFilter, setStFilter] = useState([]);
   const [tagFilter, setTagFilter] = useState([]);
   const [detailId, setDetailId] = useState(null);
+  const [newVideoModal, setNewVideoModal] = useState(false);
+  const createVideo = ({ title, tags: vTags, openDetail }) => {
+    const id = uid();
+    setPlan(p => ({ ...p, videos: [...p.videos, { id, title, status: "contacter", date: null, tags: vTags }] }));
+    setNewVideoModal(false);
+    if (openDetail) setDetailId(id);
+  };
   const [newTag, setNewTag] = useState("");
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
@@ -84,6 +91,7 @@ function VideosPage({ plan, setPlan }) {
           <div style={vidStyles.pageTitle} className="display">Vidéos</div>
           <div style={vidStyles.pageSub}>{videos.length} vidéo{videos.length > 1 ? "s" : ""} · triées de la plus récente à la plus ancienne</div>
         </div>
+        <button style={vidStyles.newVideoBtn} onClick={() => setNewVideoModal(true)}>+ Nouvelle vidéo</button>
       </div>
 
       {/* FILTRES */}
@@ -214,6 +222,10 @@ function VideosPage({ plan, setPlan }) {
         </div>}
       </div>
 
+      {newVideoModal && (
+        <NewVideoModal tags={tags} onCreate={createVideo} onClose={() => setNewVideoModal(false)} />
+      )}
+
       {detailVideo && (
         <VideoDetailModal
           video={detailVideo}
@@ -226,9 +238,10 @@ function VideosPage({ plan, setPlan }) {
 }
 
 const vidStyles = {
-  pageHead: { marginBottom: 20 },
+  pageHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 20 },
   pageTitle: { fontSize: 32, fontWeight: 700, lineHeight: 1.1 },
   pageSub: { color: "var(--muted)", fontSize: 14, marginTop: 4 },
+  newVideoBtn: { background: "var(--pink)", border: "none", color: "#fff", fontSize: 13.5, fontWeight: 700, padding: "10px 18px", borderRadius: 11, cursor: "pointer", flexShrink: 0 },
   toolbar: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 },
   search: { width: "100%", boxSizing: "border-box", background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 11, color: "var(--text)", fontSize: 14, padding: "10px 13px", outline: "none" },
   filterRow: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" },

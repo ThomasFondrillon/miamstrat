@@ -96,8 +96,6 @@ function shiftMonth(ym, delta) {
 
 function PlanningPage({ plan, setPlan }) {
 
-  const [newTitle, setNewTitle] = useState("");
-  const [newVideoTags, setNewVideoTags] = useState([]);
   const [selectedId, setSelectedId] = useState(null); // click-to-place fallback (mobile)
   const [dragOverDay, setDragOverDay] = useState(null);
   const [evOpen, setEvOpen] = useState(false);
@@ -137,14 +135,12 @@ function PlanningPage({ plan, setPlan }) {
   const STATUS_ORDER = { confirmee: 0, tourner: 1, monter: 2, publier: 3, contacter: 4, publiee: 5 };
   const sortedVideos = [...activeVideos].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
 
-  const addVideo = () => {
-    const t = newTitle.trim();
-    if (!t) return;
+  const [newVideoModal, setNewVideoModal] = useState(false);
+  const createVideo = ({ title, tags, openDetail }) => {
     const id = uid();
-    setPlan(p => ({ ...p, videos: [...p.videos, { id, title: t, status: "contacter", date: null, tags: newVideoTags }] }));
-    setNewTitle("");
-    setNewVideoTags([]);
-    setDetailId(id);
+    setPlan(p => ({ ...p, videos: [...p.videos, { id, title, status: "contacter", date: null, tags }] }));
+    setNewVideoModal(false);
+    if (openDetail) setDetailId(id);
   };
   const removeVideo = (id) => setPlan(p => ({ ...p, videos: p.videos.filter(v => v.id !== id) }));
   const cycleStatus = (id) => setPlan(p => ({
@@ -176,6 +172,7 @@ function PlanningPage({ plan, setPlan }) {
           <div style={planStyles.pageTitle} className="display">Planning des vidéos</div>
           <div style={planStyles.pageSub}>Glisse une vidéo sur un jour du calendrier — ou clique la vidéo puis le jour</div>
         </div>
+        <button style={planStyles.newVideoBtn} onClick={() => setNewVideoModal(true)}>+ Nouvelle vidéo</button>
       </div>
 
       <div className="plan-grid" style={planStyles.grid}>
@@ -200,13 +197,6 @@ function PlanningPage({ plan, setPlan }) {
             {listStFilter.length > 0 && <button style={planStyles.legendClear} onClick={() => setListStFilter([])}>effacer</button>}
           </div>
           <input value={listQuery} onChange={(e) => setListQuery(e.target.value)} placeholder="Rechercher une vidéo…" style={planStyles.listSearch} />
-          <div style={planStyles.addRow}>
-            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVideo(); }} placeholder="Nom de la vidéo…" style={planStyles.addInput} />
-            <button style={planStyles.addBtn} onClick={addVideo} disabled={!newTitle.trim()}>+</button>
-          </div>
-          {newTitle.trim() && (plan.tags || []).length > 0 && (
-            <TagPicker tags={plan.tags || []} selected={newVideoTags} onToggle={(id) => setNewVideoTags(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id])} />
-          )}
           <ul style={planStyles.list}>
             {sortedVideos.map(v => {
               const st = statusOf(v.status);
@@ -311,6 +301,10 @@ function PlanningPage({ plan, setPlan }) {
           )}
         </div>
       </div>
+
+      {newVideoModal && (
+        <NewVideoModal tags={plan.tags || []} onCreate={createVideo} onClose={() => setNewVideoModal(false)} />
+      )}
 
       {detailVideo && (
         <VideoDetailModal
@@ -470,6 +464,41 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
   );
 }
 
+// Popup express de création : titre + étiquettes, sans scroll
+function NewVideoModal({ tags, onCreate, onClose }) {
+  const [title, setTitle] = useState("");
+  const [selTags, setSelTags] = useState([]);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+  const submit = () => { const t = title.trim(); if (t) onCreate({ title: t, tags: selTags }); };
+  const submitFull = () => { const t = title.trim(); if (t) onCreate({ title: t, tags: selTags, openDetail: true }); };
+  return (
+    <div style={planStyles.overlay}>
+      <div style={{ ...planStyles.modal, width: "min(480px, 100%)" }} role="dialog" aria-label="Nouvelle vidéo">
+        <div style={planStyles.modalHead}>
+          <div style={planStyles.modalTitle} className="display">Nouvelle vidéo</div>
+          <button style={planStyles.modalClose} onClick={onClose} aria-label="Fermer">×</button>
+        </div>
+        <label style={planStyles.fieldLabel}>Titre</label>
+        <input value={title} autoFocus onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="Nom de la vidéo…" style={{ ...planStyles.textarea, minHeight: 0, fontWeight: 600 }} />
+        {tags.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <label style={planStyles.fieldLabel}>Étiquettes</label>
+            <div style={{ maxHeight: "32vh", overflowY: "auto" }}>
+              <TagPicker tags={tags} selected={selTags} onToggle={(id) => setSelTags(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id])} />
+            </div>
+          </div>
+        )}
+        <button style={{ ...planStyles.newVideoValidate, ...(title.trim() ? {} : { opacity: 0.4, cursor: "not-allowed" }) }} disabled={!title.trim()} onClick={submit}>Créer ✓</button>
+        <button style={{ ...planStyles.newVideoFullLink, ...(title.trim() ? {} : { opacity: 0.4, cursor: "not-allowed" }) }} disabled={!title.trim()} onClick={submitFull}>Créer et compléter la fiche (scripts, description…) →</button>
+      </div>
+    </div>
+  );
+}
+
 function EventDetailModal({ event, onClose: onCloseRaw, onUpdate }) {
   const onClose = React.useCallback(() => { showSavedToast(); onCloseRaw(); }, [onCloseRaw]);
   useEffect(() => {
@@ -522,7 +551,7 @@ function TagPicker({ tags, selected = [], onToggle }) {
 }
 
 const planStyles = {
-  pageHead: { marginBottom: 22 },
+  pageHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 22 },
   pageTitle: { fontSize: 32, fontWeight: 700, lineHeight: 1.1 },
   pageSub: { color: "var(--muted)", fontSize: 14, marginTop: 4 },
   grid: { display: "grid", gridTemplateColumns: "330px 1fr", gap: 14, alignItems: "start" },
@@ -531,6 +560,9 @@ const planStyles = {
   addRow: { display: "flex", gap: 6, padding: 3, background: "var(--surface-2)", border: "1px dashed var(--line-strong)", borderRadius: 11, marginBottom: 12 },
   addInput: { flex: 1, minWidth: 0, background: "transparent", border: "none", color: "var(--text)", fontSize: 13.5, padding: "8px 10px", outline: "none" },
   addBtn: { background: "var(--pink)", border: "none", color: "#fff", fontSize: 16, fontWeight: 600, width: 34, borderRadius: 8, cursor: "pointer", flexShrink: 0 },
+  newVideoBtn: { background: "var(--pink)", border: "none", color: "#fff", fontSize: 13.5, fontWeight: 700, padding: "10px 18px", borderRadius: 11, cursor: "pointer", flexShrink: 0 },
+  newVideoValidate: { marginTop: 14, width: "100%", background: "var(--pink)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, padding: "11px 14px", borderRadius: 11, cursor: "pointer" },
+  newVideoFullLink: { marginTop: 8, width: "100%", background: "transparent", border: "none", color: "var(--muted)", fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: "4px 2px" },
   newTagRow: { display: "flex", flexWrap: "wrap", gap: 5, padding: "0 2px" },
   newTagChip: { fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 99, cursor: "pointer", transition: "all 0.12s" },
   tagGroupLabel: { color: "var(--muted-2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", margin: "0 0 4px 2px" },
@@ -602,4 +634,4 @@ const planStyles = {
   cmHint: { color: "var(--muted-2)", fontSize: 11, marginTop: 6 },
 };
 
-Object.assign(window, { PlanningPage, VideoDetailModal, TagPicker, PLAN_KEY, PLAN_STATUSES, TAG_COLORS, loadPlan, statusOf });
+Object.assign(window, { PlanningPage, VideoDetailModal, NewVideoModal, TagPicker, PLAN_KEY, PLAN_STATUSES, TAG_COLORS, loadPlan, statusOf });
