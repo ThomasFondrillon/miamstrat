@@ -326,7 +326,12 @@ function PlanningPage({ plan, setPlan }) {
         <div style={planStyles.calCard}>
           <div style={planStyles.calHead}>
             <button style={planStyles.calNav} onClick={() => setPlan(p => ({ ...p, month: shiftMonth(p.month, -1) }))} aria-label="Mois précédent">‹</button>
-            <div style={planStyles.calTitle} className="display">{monthLabel(plan.month)}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={planStyles.calTitle} className="display">{monthLabel(plan.month)}</div>
+              {plan.month !== planToday().slice(0, 7) && (
+                <button style={planStyles.calTodayBtn} onClick={() => setPlan(p => ({ ...p, month: planToday().slice(0, 7) }))} title="Revenir au mois en cours">Aujourd'hui</button>
+              )}
+            </div>
             <button style={planStyles.calNav} onClick={() => setPlan(p => ({ ...p, month: shiftMonth(p.month, 1) }))} aria-label="Mois suivant">›</button>
           </div>
           <div style={planStyles.dowRow}>
@@ -764,6 +769,7 @@ const planStyles = {
   calHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   calTitle: { fontSize: 19, fontWeight: 700 },
   calNav: { width: 34, height: 34, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line-strong)", color: "var(--text)", fontSize: 18, cursor: "pointer", lineHeight: 1 },
+  calTodayBtn: { background: "transparent", border: "1px solid var(--line-strong)", color: "var(--muted)", fontSize: 10.5, fontWeight: 600, padding: "3px 9px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" },
   dowRow: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 },
   dow: { textAlign: "center", color: "var(--muted-2)", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", padding: "4px 0" },
   calGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 },
