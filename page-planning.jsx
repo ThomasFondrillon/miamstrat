@@ -326,7 +326,7 @@ function PlanningPage({ plan, setPlan }) {
         <div style={planStyles.calCard}>
           <div style={planStyles.calHead}>
             <button style={planStyles.calNav} onClick={() => setPlan(p => ({ ...p, month: shiftMonth(p.month, -1) }))} aria-label="Mois précédent">‹</button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative", flex: 1, textAlign: "center" }}>
               <div style={planStyles.calTitle} className="display">{monthLabel(plan.month)}</div>
               {plan.month !== planToday().slice(0, 7) && (
                 <button style={planStyles.calTodayBtn} onClick={() => setPlan(p => ({ ...p, month: planToday().slice(0, 7) }))} title="Revenir au mois en cours">Aujourd'hui</button>
@@ -444,32 +444,34 @@ function VideoRow({ video, st, isSel, onSelect, onCycle, onCycleState, onAddStat
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); onDropRow && onDropRow(); }}
       style={{ ...planStyles.row, ...(isSel ? planStyles.rowSel : {}) }}>
-      <span style={planStyles.grip} title="Glisser pour réorganiser ou planifier">⋮⋮</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {isEditing ? (
-          <input autoFocus defaultValue={video.title}
-            onBlur={(e) => { onEdit(e.target.value); setEditing(false); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { onEdit(e.target.value); setEditing(false); } }}
-            style={planStyles.editInput} />
-        ) : (
-          <button style={planStyles.rowTitle} onClick={onSelect} onDoubleClick={() => setEditing(true)} title="Clic : sélectionner pour planifier · double-clic : renommer">{video.title}</button>
-        )}
-        <div style={planStyles.rowMeta}>
-          {Object.keys(video.stateDates || {}).length === 0 && (
-            <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={onCycle} title="Cliquer pour changer le statut">{st.label}</button>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <span style={planStyles.grip} title="Glisser pour réorganiser ou planifier">⋮⋮</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {isEditing ? (
+            <input autoFocus defaultValue={video.title}
+              onBlur={(e) => { onEdit(e.target.value); setEditing(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { onEdit(e.target.value); setEditing(false); } }}
+              style={planStyles.editInput} />
+          ) : (
+            <button style={planStyles.rowTitle} onClick={onSelect} onDoubleClick={() => setEditing(true)} title="Clic : sélectionner pour planifier · double-clic : renommer">{video.title}</button>
           )}
-          {Object.entries(video.stateDates || {}).map(([sid, d]) => {
-            const s = statusOf(sid);
-            return <button key={sid} style={{ ...planStyles.statusChip, color: s.color, background: s.bg }} onClick={() => onCycleState(sid)} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
-          })}
-          <button style={planStyles.addStateChip} onClick={onAddState} title="Gérer les états et leurs dates">+</button>
         </div>
+        <button style={planStyles.detailBtn} onClick={onDetail} aria-label="Détail de la vidéo" title="Scripts, descriptions & message CM">📄</button>
+        {onSendToIdeas && <button style={planStyles.detailBtn} onClick={() => { if (confirmSendToIdeas(video)) onSendToIdeas(video); }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>}
+        <button className="obj-remove-btn" style={planStyles.remove} onClick={onRemove} aria-label="Supprimer" title="Supprimer">
+          <Icon.Trash />
+        </button>
       </div>
-      <button style={planStyles.detailBtn} onClick={onDetail} aria-label="Détail de la vidéo" title="Scripts, descriptions & message CM">📄</button>
-      {onSendToIdeas && <button style={planStyles.detailBtn} onClick={() => { if (confirmSendToIdeas(video)) onSendToIdeas(video); }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>}
-      <button className="obj-remove-btn" style={planStyles.remove} onClick={onRemove} aria-label="Supprimer" title="Supprimer">
-        <Icon.Trash />
-      </button>
+      <div style={planStyles.rowMeta}>
+        {Object.keys(video.stateDates || {}).length === 0 && (
+          <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={onCycle} title="Cliquer pour changer le statut">{st.label}</button>
+        )}
+        {Object.entries(video.stateDates || {}).map(([sid, d]) => {
+          const s = statusOf(sid);
+          return <button key={sid} style={{ ...planStyles.statusChip, color: s.color, background: s.bg }} onClick={() => onCycleState(sid)} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
+        })}
+        <button style={planStyles.addStateChip} onClick={onAddState} title="Gérer les états et leurs dates">+</button>
+      </div>
     </li>
   );
 }
@@ -742,12 +744,12 @@ const planStyles = {
   tagGroupLabel: { color: "var(--muted-2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", margin: "0 0 4px 2px" },
   list: { listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 },
   empty: { color: "var(--muted)", fontSize: 13.5, padding: "14px 0", textAlign: "center", fontStyle: "italic" },
-  row: { display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 10px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12, cursor: "grab", transition: "all 0.15s" },
+  row: { display: "block", padding: "10px 10px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12, cursor: "grab", transition: "all 0.15s" },
   rowSel: { border: "1px solid var(--pink)", boxShadow: "0 0 0 3px var(--pink-soft)" },
   grip: { color: "var(--muted-2)", fontSize: 11, letterSpacing: "-2px", paddingTop: 3, flexShrink: 0, userSelect: "none" },
   rowTitle: { display: "block", width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 13.5, fontWeight: 500, textAlign: "left", padding: 0, lineHeight: 1.35, cursor: "pointer" },
   rowMeta: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" },
-  statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer" },
+  statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
   dateTag: { display: "inline-flex", alignItems: "center", gap: 3, color: "var(--muted)", fontSize: 10.5 },
   modalDateWrap: { display: "inline-flex", alignItems: "center", gap: 4, color: "var(--muted)", fontSize: 11 },
   modalDateInput: { background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 7, color: "var(--text)", fontSize: 11.5, padding: "3px 6px", outline: "none", cursor: "pointer" },
@@ -757,19 +759,19 @@ const planStyles = {
   stateDateLabel: { fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" },
   stateDateInput: { background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 7, color: "var(--text)", fontSize: 11, padding: "3px 6px", outline: "none", cursor: "pointer" },
   stateDateAdd: { alignSelf: "flex-end", background: "var(--surface-2)", border: "1px dashed var(--line-strong)", borderRadius: 7, color: "var(--muted)", fontSize: 11, padding: "4px 6px", outline: "none", cursor: "pointer" },
-  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", lineHeight: 1.4 },
+  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, lineHeight: 1.4 },
   stateModalRow: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 11 },
   editInput: { width: "100%", background: "var(--bg)", border: "1px solid var(--pink)", borderRadius: 8, color: "var(--text)", fontSize: 13.5, padding: "5px 8px", outline: "none" },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 5, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   legendBox: { display: "flex", flexWrap: "wrap", gap: 5, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" },
-  legendChip: { fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99 },
+  legendChip: { fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, whiteSpace: "nowrap" },
   legendClear: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 10, textDecoration: "underline", cursor: "pointer", padding: "2px 4px" },
   listSearch: { width: "100%", boxSizing: "border-box", background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 10, color: "var(--text)", fontSize: 13, padding: "8px 11px", outline: "none" },
   calCard: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 22, padding: "20px 20px 16px" },
   calHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
   calTitle: { fontSize: 19, fontWeight: 700 },
   calNav: { width: 34, height: 34, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line-strong)", color: "var(--text)", fontSize: 18, cursor: "pointer", lineHeight: 1 },
-  calTodayBtn: { background: "transparent", border: "1px solid var(--line-strong)", color: "var(--muted)", fontSize: 10.5, fontWeight: 600, padding: "3px 9px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap" },
+  calTodayBtn: { position: "absolute", left: "50%", transform: "translateX(-50%)", top: "100%", marginTop: 1, background: "transparent", border: "1px solid var(--line)", color: "var(--muted-2)", fontSize: 9, fontWeight: 600, padding: "1px 7px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", zIndex: 2 },
   dowRow: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 },
   dow: { textAlign: "center", color: "var(--muted-2)", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", padding: "4px 0" },
   calGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 },

@@ -142,22 +142,24 @@ function VideosPage({ plan, setPlan }) {
           const vTags = (v.tags || []).map(id => tags.find(t => t.id === id)).filter(Boolean);
           return (
             <div key={v.id} className="obj-row" style={vidStyles.row}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <button style={vidStyles.rowTitle} onClick={() => setDetailId(v.id)} title="Ouvrir la fiche">{v.title}</button>
-                <div style={vidStyles.rowMeta}>
-                  {Object.keys(v.stateDates || {}).length === 0 && (
-                    <button style={{ ...vidStyles.statusChip, color: st.color, background: st.bg }} onClick={() => cycleStatus(v.id)} title="Cliquer pour changer le statut">{st.label}</button>
-                  )}
-                  {Object.entries(v.stateDates || {}).map(([sid, d]) => {
-                    const s = statusOf(sid);
-                    return <button key={sid} style={{ ...vidStyles.statusChip, color: s.color, background: s.bg }} onClick={() => setPlan(p => ({ ...p, videos: p.videos.map(x => x.id === v.id ? { ...x, ...(cycleStateDatePatch(x, sid) || {}) } : x) }))} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
-                  })}
-                  <button style={vidStyles.addStateChip} onClick={() => setStateDatesId(v.id)} title="Gérer les états et leurs dates">+</button>
-                  {vTags.map(t => <span key={t.id} style={{ ...vidStyles.tagChip, color: t.color, border: `1px solid ${t.color}` }}>{t.name}</span>)}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <button style={vidStyles.rowTitle} onClick={() => setDetailId(v.id)} title="Ouvrir la fiche">{v.title}</button>
                 </div>
+                <button style={{ ...vidStyles.remove, fontSize: 13, lineHeight: 1 }} onClick={() => { if (confirmSendToIdeas(v)) { if (sendVideoToIdeas(v)) setPlan(p => ({ ...p, videos: p.videos.filter(x => x.id !== v.id) })); } }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>
+                <button className="obj-remove-btn" style={vidStyles.remove} onClick={() => { if (confirm(`Supprimer « ${v.title} » ?`)) removeVideo(v.id); }} aria-label="Supprimer" title="Supprimer"><Icon.Trash /></button>
               </div>
-              <button style={{ ...vidStyles.remove, fontSize: 13, lineHeight: 1 }} onClick={() => { if (confirmSendToIdeas(v)) { if (sendVideoToIdeas(v)) setPlan(p => ({ ...p, videos: p.videos.filter(x => x.id !== v.id) })); } }} aria-label="Renvoyer dans les Idées" title="Renvoyer dans les Idées (titre + script FR conservés)">↩</button>
-              <button className="obj-remove-btn" style={vidStyles.remove} onClick={() => { if (confirm(`Supprimer « ${v.title} » ?`)) removeVideo(v.id); }} aria-label="Supprimer" title="Supprimer"><Icon.Trash /></button>
+              <div style={vidStyles.rowMeta}>
+                {Object.keys(v.stateDates || {}).length === 0 && (
+                  <button style={{ ...vidStyles.statusChip, color: st.color, background: st.bg }} onClick={() => cycleStatus(v.id)} title="Cliquer pour changer le statut">{st.label}</button>
+                )}
+                {Object.entries(v.stateDates || {}).map(([sid, d]) => {
+                  const s = statusOf(sid);
+                  return <button key={sid} style={{ ...vidStyles.statusChip, color: s.color, background: s.bg }} onClick={() => setPlan(p => ({ ...p, videos: p.videos.map(x => x.id === v.id ? { ...x, ...(cycleStateDatePatch(x, sid) || {}) } : x) }))} title="Cliquer pour passer à l'état suivant (la date suit)">{s.label} · {d.slice(8)}/{d.slice(5, 7)}</button>;
+                })}
+                <button style={vidStyles.addStateChip} onClick={() => setStateDatesId(v.id)} title="Gérer les états et leurs dates">+</button>
+                {vTags.map(t => <span key={t.id} style={{ ...vidStyles.tagChip, color: t.color, border: `1px solid ${t.color}` }}>{t.name}</span>)}
+              </div>
             </div>
           );
         })}
@@ -250,11 +252,11 @@ const vidStyles = {
   dateLabel: { display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 12 },
   dateInput: { background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 8, color: "var(--text)", fontSize: 12.5, padding: "6px 9px", outline: "none", cursor: "pointer" },
   listCard: { background: "var(--surface)", border: "1px solid var(--line-strong)", borderRadius: 18, padding: 10, display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 },
-  row: { display: "flex", alignItems: "flex-start", gap: 8, padding: "11px 12px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12 },
+  row: { display: "block", padding: "11px 12px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12 },
   rowTitle: { display: "block", width: "100%", background: "transparent", border: "none", color: "var(--text)", fontSize: 14.5, fontWeight: 600, textAlign: "left", padding: 0, lineHeight: 1.35, cursor: "pointer" },
   rowMeta: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" },
-  statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer" },
-  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", lineHeight: 1.4 },
+  statusChip: { border: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 },
+  addStateChip: { border: "1px dashed var(--line-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, lineHeight: 1.4 },
   tagChip: { fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: "transparent" },
   dateTag: { color: "var(--muted)", fontSize: 10.5 },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 6, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
