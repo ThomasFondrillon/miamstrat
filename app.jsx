@@ -326,6 +326,7 @@ function StrategyPage({ state, setState }) {
         onSetRewardRange={(min, max) => setRewardRange(selectedTier.id, min, max)}
       />
 
+      <BrandStrategyPanel strat={state} />
       <HorizonPanel />
       <RulesPanel />
     </div>

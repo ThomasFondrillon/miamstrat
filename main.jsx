@@ -32,7 +32,7 @@ function Shell() {
     return () => { document.removeEventListener("dragover", onDrag); document.removeEventListener("drop", onEnd); document.removeEventListener("dragend", onEnd); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
-  const DATA_KEYS = ["miamstrat_v2", "miamstrat_daily_v1", "miamstrat_plan_v1", "miamstrat_msgs_v1", "miamstrat_ideas_v1", "miamstrat_page"];
+  const DATA_KEYS = ["miamstrat_v2", "miamstrat_daily_v1", "miamstrat_plan_v1", "miamstrat_msgs_v1", "miamstrat_ideas_v1", "miamstrat_brand_v1", "miamstrat_page"];
   const fileRef = React.useRef(null);
   const [importMsg, setImportMsg] = useState(null);
   const [installHelp, setInstallHelp] = useState(false);
