@@ -1,6 +1,26 @@
 const { useState: useStateBP, useEffect: useEffectBP } = React;
 
 const BRAND_KEY = "miamstrat_brand_v1";
+const TOOLBOX_KEY = "miamstrat_toolbox_v1";
+const DEFAULT_TOOLBOX = [
+  { id: "t1", title: "Contexte de ma marque", desc: "Fichier .md extrait de ce bloc, à jour, collé en instructions de projet IA.", done: false },
+  { id: "t2", title: "Skill « script de Reel »", desc: "Lieu + 3 infos clés → script FR/ENG à ma structure (hook 3s, déroulé, CTA).", done: false },
+  { id: "t3", title: "Skill « description »", desc: "Reel tourné → description SEO + hashtags + texte de story.", done: false },
+  { id: "t4", title: "Skill « démarchage »", desc: "Nom de l'établissement → message personnalisé avec un angle spécifique au lieu.", done: false },
+  { id: "t5", title: "Skill « guide »", desc: "Thème + mes vidéos publiées → guide récapitulatif (ex : 10 brunchs testés à Paris).", done: false },
+  { id: "t6", title: "Skill « scoring d'idées »", desc: "Ma liste d'idées → notes 1-5 selon ma grille + priorisation.", done: false },
+  { id: "t7", title: "Skill « calendrier éditorial »", desc: "Événements + stock de vidéos + piliers → planning de la semaine.", done: false },
+];
+function loadToolbox() {
+  try {
+    const raw = localStorage.getItem(TOOLBOX_KEY);
+    if (!raw) return DEFAULT_TOOLBOX;
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return DEFAULT_TOOLBOX;
+    // migration : anciens items { text } → { title, desc }
+    return p.map(t => t.title !== undefined ? t : { id: t.id, title: t.text || "", desc: "", done: !!t.done });
+  } catch (e) { return DEFAULT_TOOLBOX; }
+}
 const DEFAULT_BRAND = {
   positioning: "Créatrice food & sorties à Paris. Je fais découvrir des restos, activités et bons plans testés et approuvés, pour sortir sans se ruiner ni se tromper.",
   audience: "20-35 ans, majoritairement parisiens et franciliens, très réactifs aux bons plans. Cherchent des idées concrètes pour le week-end.",
@@ -84,6 +104,9 @@ function BrandStrategyPanel({ strat }) {
   const [brand, setBrand] = useStateBP(loadBrand);
   useEffectBP(() => { try { localStorage.setItem(BRAND_KEY, JSON.stringify(brand)); } catch (e) {} }, [brand]);
   const [open, setOpen] = useStateBP(false);
+  const [toolbox, setToolbox] = useStateBP(loadToolbox);
+  useEffectBP(() => { try { localStorage.setItem(TOOLBOX_KEY, JSON.stringify(toolbox)); } catch (e) {} }, [toolbox]);
+  const toolsDone = toolbox.filter(t => t.done).length;
 
   const patch = (p) => setBrand(b => ({ ...b, ...p }));
   const patchItem = (listKey, id, p) => setBrand(b => ({ ...b, [listKey]: b[listKey].map(x => x.id === id ? { ...x, ...p } : x) }));
@@ -163,6 +186,23 @@ function BrandStrategyPanel({ strat }) {
             </div>
           </div>
 
+          <div>
+            <label style={bpStyles.label}>Boîte à outils IA <span style={{ color: "var(--muted)", textTransform: "none", letterSpacing: 0 }}>· mes livrables & skills · {toolsDone}/{toolbox.length} prêts</span></label>
+            <div style={bpStyles.list}>
+              {toolbox.map(t => (
+                <div key={t.id} style={{ ...bpStyles.toolRow, ...(t.done ? { opacity: 0.65 } : {}) }}>
+                  <input type="checkbox" checked={!!t.done} onChange={() => setToolbox(l => l.map(x => x.id === t.id ? { ...x, done: !x.done } : x))} style={{ accentColor: "var(--pink)", width: 16, height: 16, flexShrink: 0, cursor: "pointer", marginTop: 2 }} />
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                    <input value={t.title} onChange={(e) => setToolbox(l => l.map(x => x.id === t.id ? { ...x, title: e.target.value } : x))} placeholder="Titre du livrable…" style={{ ...bpStyles.toolTitle, ...(t.done ? { textDecoration: "line-through", color: "var(--muted)" } : {}) }} />
+                    <textarea value={t.desc} onChange={(e) => setToolbox(l => l.map(x => x.id === t.id ? { ...x, desc: e.target.value } : x))} placeholder="Description : ce que le livrable prend en entrée et produit en sortie…" rows={1} style={bpStyles.toolDesc} />
+                  </div>
+                  <button className="obj-remove-btn" style={bpStyles.remove} onClick={() => setToolbox(l => l.filter(x => x.id !== t.id))} aria-label="Supprimer" title="Supprimer"><Icon.Trash /></button>
+                </div>
+              ))}
+              <button style={bpStyles.addBtn} onClick={() => setToolbox(l => [...l, { id: uid(), title: "", desc: "", done: false }])}>+ Ajouter un livrable</button>
+            </div>
+          </div>
+
           <div style={bpStyles.hint}>« ⤓ Extraire pour l'IA » télécharge un fichier <span className="mono">.md</span> avec tout ce bloc — colle-le au début d'une conversation IA (ou en instructions de projet) pour que chaque réponse respecte ta stratégie.</div>
         </div>
       )}
@@ -186,6 +226,9 @@ const bpStyles = {
   input: { boxSizing: "border-box", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--text)", fontSize: 13, padding: "7px 10px", outline: "none", minWidth: 0 },
   addBtn: { alignSelf: "flex-start", background: "transparent", border: "1px dashed var(--line-strong)", color: "var(--muted)", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 9, cursor: "pointer" },
   remove: { flexShrink: 0, background: "transparent", border: "1px solid var(--line)", color: "var(--muted)", padding: 5, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  toolRow: { display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 10px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12 },
+  toolTitle: { background: "transparent", border: "none", color: "var(--text)", fontSize: 13.5, fontWeight: 700, padding: 0, outline: "none", width: "100%" },
+  toolDesc: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 12.5, lineHeight: 1.45, padding: 0, outline: "none", width: "100%", resize: "none", fontFamily: "inherit", fieldSizing: "content" },
   hint: { color: "var(--muted)", fontSize: 12, lineHeight: 1.5, padding: "10px 12px", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 11 },
 };
 
