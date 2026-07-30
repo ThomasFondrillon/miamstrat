@@ -93,11 +93,10 @@ function loadPlan() {
     if (!p || !Array.isArray(p.videos)) return base;
     // migration des anciens statuts + des plans sans événements
     p.videos = p.videos.map(v => PLAN_STATUS_MIGRATION[v.status] ? { ...v, status: PLAN_STATUS_MIGRATION[v.status] } : v);
-    // migration : date unique → dates par état
+    // migration : date unique → date portée par l'état de la vidéo au moment de la migration
     p.videos = p.videos.map(v => {
       if (v.date && !v.stateDates) {
-        const key = ["publier", "publiee"].includes(v.status) ? v.status : "publiee";
-        return { ...v, stateDates: { [key]: v.date } };
+        return { ...v, stateDates: { [v.status]: v.date } };
       }
       return v;
     });

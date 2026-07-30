@@ -4,7 +4,9 @@ const { useState, useEffect, useMemo } = React;
 function StatsPage({ plan }) {
   const videos = plan.videos || [];
   const tags = plan.tags || [];
-  const published = videos.filter(v => v.status === "publiee");
+  // machine à états : une vidéo est « publiée » si l'état publiee lui est associé ; sa date de publication = date de cet état
+  const pubDate = (v) => (v.stateDates || {}).publiee || (v.status === "publiee" ? v.date : null);
+  const published = videos.filter(v => videoStates(v).includes("publiee"));
 
   // ─── publications par mois (6 derniers mois) ───
   const perMonth = useMemo(() => {
@@ -13,14 +15,14 @@ function StatsPage({ plan }) {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      months.push({ key, label: d.toLocaleDateString("fr-FR", { month: "short" }), count: published.filter(v => v.date && v.date.slice(0, 7) === key).length });
+      months.push({ key, label: d.toLocaleDateString("fr-FR", { month: "short" }), count: published.filter(v => (pubDate(v) || "").slice(0, 7) === key).length });
     }
     return months;
   }, [published]);
   const maxMonth = Math.max(1, ...perMonth.map(m => m.count));
 
   // ─── répartition par état ───
-  const byStatus = PLAN_STATUSES.map(s => ({ st: s, count: videos.filter(v => v.status === s.id).length })).filter(x => x.count > 0);
+  const byStatus = PLAN_STATUSES.map(s => ({ st: s, count: videos.filter(v => videoStates(v).includes(s.id)).length })).filter(x => x.count > 0);
   const totalVideos = videos.length;
   const inProgress = videos.filter(v => ["tourner", "monter", "publier"].includes(v.status)).length;
   // date locale (pas UTC) pour comparer aux dates du calendrier
@@ -30,15 +32,24 @@ function StatsPage({ plan }) {
 
   // ─── KPI développement ───
   const dateNDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  const pubIn = (from, to) => published.filter(v => v.date && v.date >= from && v.date < to).length;
+  const pubIn = (from, to) => published.filter(v => { const d = pubDate(v); return d && d >= from && d < to; }).length;
   const last4w = pubIn(dateNDaysAgo(28), todayStr2 + "z");
   const prev4w = pubIn(dateNDaysAgo(56), dateNDaysAgo(28));
   const rate = (last4w / 4);
   const trend = last4w > prev4w ? "↗" : last4w < prev4w ? "↘" : "→";
   const trendColor = last4w > prev4w ? "var(--green)" : last4w < prev4w ? "#ff6b6b" : "var(--muted)";
-  const late = videos.filter(v => v.date && v.date < todayStr2 && v.status !== "publiee").length;
+  // en retard : au moins un état non « publiée » daté dans le passé
+  const late = videos.filter(v => {
+    const sd = v.stateDates || {};
+    if (Object.keys(sd).length) return Object.entries(sd).some(([sid, d]) => sid !== "publiee" && d < todayStr2);
+    return v.date && v.date < todayStr2 && v.status !== "publiee";
+  }).length;
   // stock = à publier + publiées planifiées après aujourd'hui (publication auto à venir)
-  const stock = videos.filter(v => v.status === "publier" || (v.status === "publiee" && v.date && v.date > todayStr2)).length;
+  const stock = videos.filter(v => {
+    const sd = v.stateDates || {};
+    if (Object.keys(sd).length || videoStates(v).includes("publier")) return !!sd.publier || videoStates(v).includes("publier") || (sd.publiee && sd.publiee > todayStr2);
+    return v.status === "publier" || (v.status === "publiee" && v.date && v.date > todayStr2);
+  }).length;
   const stockWeeks = rate > 0 ? (stock / rate) : null;
 
   // ─── stats étiquettes (vidéos publiées) ───
@@ -59,8 +70,8 @@ function StatsPage({ plan }) {
       <div style={stStyles.card}>
         <div style={stStyles.funnel} className="st-funnel">
           {[
-            { label: "À tourner", count: videos.filter(v => v.status === "tourner").length, color: "var(--pink)", bg: "var(--pink-soft)" },
-            { label: "À monter", count: videos.filter(v => v.status === "monter").length, color: "var(--gold)", bg: "var(--gold-soft)" },
+            { label: "À tourner", count: videos.filter(v => videoStates(v).includes("tourner")).length, color: "var(--pink)", bg: "var(--pink-soft)" },
+            { label: "À monter", count: videos.filter(v => videoStates(v).includes("monter")).length, color: "var(--gold)", bg: "var(--gold-soft)" },
             { label: "Publiée", count: published.length, color: "var(--green)", bg: "var(--green-soft)" },
           ].map((s, i, arr) => (
             <React.Fragment key={s.label}>

@@ -36,18 +36,21 @@ function VideosPage({ plan, setPlan }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // toutes les dates d'une vidéo (une par état, + ancienne date unique en fallback)
+    const datesOf = (v) => { const ds = Object.values(v.stateDates || {}); return ds.length ? ds : (v.date ? [v.date] : []); };
+    const latestOf = (v) => { const ds = datesOf(v); return ds.length ? ds.slice().sort().pop() : null; };
     return [...videos]
       .filter(v =>
         (!q || v.title.toLowerCase().includes(q)) &&
         (stFilter.length === 0 || stFilter.some(id => videoStates(v).includes(id))) &&
         (tagFilter.length === 0 || activeTagFilter.length === 0 || activeTagFilter.some(t => (v.tags || []).includes(t))) &&
-        (!dateFrom || (v.date && v.date >= dateFrom)) &&
-        (!dateTo || (v.date && v.date <= dateTo)))
+        ((!dateFrom && !dateTo) || datesOf(v).some(d => (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo))))
       .sort((a, b) => {
-        if (!a.date && !b.date) return 0;
-        if (!a.date) return -1;
-        if (!b.date) return 1;
-        return b.date.localeCompare(a.date);
+        const da = latestOf(a), db = latestOf(b);
+        if (!da && !db) return 0;
+        if (!da) return -1;
+        if (!db) return 1;
+        return db.localeCompare(da);
       });
   }, [videos, query, stFilter, activeTagFilter, dateFrom, dateTo]);
 
