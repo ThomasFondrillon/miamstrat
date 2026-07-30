@@ -278,4 +278,24 @@ shellStyleEl.textContent = `
 `;
 document.head.appendChild(shellStyleEl);
 
-ReactDOM.createRoot(document.getElementById("root")).render(<Shell />);
+// Synchronisation multi-onglets : si un autre onglet modifie les données (event storage),
+// on remonte toute l'app au retour sur cet onglet pour recharger le localStorage à jour —
+// sinon le premier onglet écraserait les saisies du second avec son état périmé.
+function Root() {
+  const [gen, setGen] = React.useState(0);
+  React.useEffect(() => {
+    let stale = false;
+    const onStorage = (e) => {
+      if (!e.key || !e.key.startsWith("miamstrat_")) return;
+      if (document.hidden) { stale = false; setGen(g => g + 1); } else stale = true;
+    };
+    const refresh = () => { if (stale) { stale = false; setGen(g => g + 1); } };
+    const onVis = () => { if (!document.hidden) refresh(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
+  return <Shell key={gen} />;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Root />);

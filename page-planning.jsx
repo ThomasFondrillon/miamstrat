@@ -527,7 +527,7 @@ function VideoDetailModal({ video, tags = [], onClose: onCloseRaw, onUpdate }) {
       <div style={planStyles.modal} role="dialog" aria-label={`Détail — ${video.title}`}>
         <div style={planStyles.modalHead}>
           <div style={{ minWidth: 0 }}>
-            <div style={planStyles.modalTitle} className="display">{video.title}</div>
+            <input value={video.title} onChange={(e) => onUpdate({ title: e.target.value })} placeholder="Titre de la vidéo…" style={{ ...planStyles.modalTitle, display: "block", width: "100%", background: "transparent", border: "none", borderBottom: "1px dashed var(--line-strong)", padding: "0 0 2px", outline: "none", color: "var(--text)", fontFamily: "inherit" }} className="display" title="Modifier le titre" />
             <div style={planStyles.rowMeta}>
               {Object.keys(video.stateDates || {}).length === 0 && (
                 <button style={{ ...planStyles.statusChip, color: st.color, background: st.bg }} onClick={() => { const i = PLAN_STATUSES.findIndex(s => s.id === video.status); onUpdate({ status: PLAN_STATUSES[(i + 1) % PLAN_STATUSES.length].id }); }} title="Cliquer pour changer l'état">{st.label}</button>
